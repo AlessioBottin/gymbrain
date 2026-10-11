@@ -35,7 +35,7 @@ test('real account: sync to the shared database, expired-login offline cache, re
           const r = await admin.from('training_records').select('id').eq('user_id', data.user.id)
           return r.data?.length
         },
-        { timeout: 20000 },
+        { timeout: 45000 },
       )
       .toBe(1)
     await page.evaluate(async () => {

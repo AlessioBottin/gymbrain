@@ -54,6 +54,8 @@ La prima migrazione conserva la storia del cambiamento; lo stato finale richiede
 
 ## Render e Supabase
 
+App pubblicata: **https://gymbrain-llkm.onrender.com**. Deploy iniziale `5b7fc47` su `main`, Free / Frankfurt. Verificati il 11 ottobre 2026: homepage e health check (`ok: true`, `configured: true`), login reale, scrittura sul database, modifica offline e sincronizzazione alla riconnessione. Site URL e redirect Supabase Auth configurati per questa origine HTTPS. SMTP personalizzato ancora da configurare.
+
 `render.yaml` definisce un servizio Node **Free** a Francoforte. Collegare il repository GitHub, impostare `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` e `SUPABASE_SECRET_KEY` nel servizio. Build e frontend usano solo URL e chiave pubblica; la secret key resta nel processo Fastify.
 
 Impostare in Supabase Auth il Site URL e i Redirect URL all’indirizzo HTTPS Render finale. Per conferma email e recupero password degli amici serve un SMTP configurato; il servizio email predefinito Supabase non è un servizio di invio generico per utenti esterni al team. Non disabilitare la conferma email come scorciatoia.
@@ -85,4 +87,4 @@ Il deploy rimuove le dipendenze di sviluppo dopo la build. Audit delle dipendenz
 - Gestione amministrativa, inviti e statistiche avanzate fuori dal primo rilascio.
 - Test iPhone fisico e invio email SMTP da completare sui servizi configurati.
 
-La presenza dei file di deploy non dimostra un deploy riuscito: lo stato effettivo viene comunicato dopo i controlli cloud.
+La verifica browser in produzione utilizza account temporanei confermati tramite amministrazione, poi eliminati; non dimostra la consegna delle email di registrazione o recupero password.
