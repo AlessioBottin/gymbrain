@@ -1,0 +1,26 @@
+GYMBRAIN — PREVIEW UI IMMERSIVA
+
+Apri index.html nel browser oppure, dalla cartella principale:
+  npm run ui
+Poi visita http://127.0.0.1:4173/preview/
+Non servono dipendenze per questa anteprima.
+
+Puoi navigare fra Oggi, Percorso, Esercizi e Progressi; cambiare giornata;
+avviare e riprendere una sessione; registrare serie, carichi e RPE/RIR;
+sostituire un esercizio per la sessione; usare il timer di recupero;
+concludere tutte le serie e consultare il riepilogo; aggiungere un esercizio;
+modificare il peso corporeo.
+
+È un prototipo UI in HTML/CSS/JavaScript, riferimento per Nuxt/Vue.
+Non è ancora la PWA: autenticazione, database, sincronizzazione offline,
+allegati e integrazioni WHOOP/Withings non sono collegati.
+I dati demo sono distinti dalle sessioni aggiunte. Peso, nuovi esercizi
+e sessioni concluse sono salvati in localStorage quando disponibile.
+Una sessione in corso resta solo nella memoria della pagina: ricaricando
+la pagina viene persa. Il grafico del peso è illustrativo.
+
+Il layout si adatta a desktop e mobile e rispetta prefers-reduced-motion.
+I font Google sono facoltativi: in assenza di rete si usano font di sistema.
+I file Nuxt nella radice sono uno scaffold non ancora installato/verificato.
+
+Le decisioni di prodotto si trovano in GYMBRAIN-DECISIONI.md.
