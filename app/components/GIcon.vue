@@ -21,7 +21,21 @@ const paths: Record<string, string> = {
   undo: 'M4 4v6h6M4 10a8 8 0 1 1 0 7',
   bolt: 'm13 2-9 12h7l-1 8 10-13h-7l0-7',
   info: 'M12 11v6M12 7h.01M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',
-  menu: 'M4 6h16M4 12h16M4 18h16'
+  menu: 'M4 6h16M4 12h16M4 18h16',
 }
 </script>
-<template><svg :width="size || 20" :height="size || 20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="paths[name] || paths.grid" /></svg></template>
+<template>
+  <svg
+    :width="size || 20"
+    :height="size || 20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="1.65"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    aria-hidden="true"
+  >
+    <path :d="paths[name] || paths.grid" />
+  </svg>
+</template>

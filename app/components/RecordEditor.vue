@@ -1,16 +1,263 @@
 <script setup lang="ts">
-import {newTarget, type LocalRecord,type Prescription,type Exercise, type Kind} from '../../shared/domain'
-const props=defineProps<{open:boolean;kind:Kind;record?:LocalRecord;parentId?:string;catalog:LocalRecord[]}>()
-const emit=defineEmits<{close:[];save:[kind:Kind,payload:any,id?:string,parentId?:string|null,revision?:number]}>()
-const draft=ref<any>({}),error=ref(''),selectedExercise=ref('')
-const prescriptions=computed(()=>draft.value.exercises as Prescription[])
-const fields=['reps','load','rpe','rir','tut'] as const
-const modes=[['bodyweight','Corpo libero'],['weighted','Zavorra'],['external','Carico esterno'],['band','Banda elastica']]
-watch(()=>props.open,value=>{if(!value)return;error.value='';selectedExercise.value='';draft.value=props.record?JSON.parse(JSON.stringify(props.record.payload)):props.kind==='exercise'?{name:'',description:'',notes:'',mode:'bodyweight',videoUrl:'',videoPath:''}:props.kind==='cycle'?{name:'',notes:'',start:new Date().toISOString().slice(0,10),weeks:6}:props.kind==='plan'?{name:'',notes:'',order:0}:props.kind==='weight'?{kg:75,measuredAt:new Date().toISOString(),source:'manual'}:{name:'',notes:'',order:0,exercises:[]} })
-function addExercise(){const row=props.catalog.find(r=>r.id===selectedExercise.value);if(!row)return;const e=row.payload as Exercise;draft.value.exercises.push({id:crypto.randomUUID(),exerciseId:row.id,name:e.name,notes:'',mode:e.mode,band:'',alternatives:[],sets:[newTarget(),newTarget(),newTarget()]} satisfies Prescription);selectedExercise.value=''}
-function move(index:number,dir:number){const list=draft.value.exercises,other=index+dir;if(other<0||other>=list.length)return;[list[index],list[other]]=[list[other],list[index]]}
-function submit(){emit('save',props.kind,JSON.parse(JSON.stringify(draft.value)),props.record?.id,props.record?.parent_id??props.parentId??null,props.record?.localRevision)}
-function clean(set:any,key:string,event:Event){const value=(event.target as HTMLInputElement).value;set[key]=value===''?null:Number(value)}
+import { newTarget, type LocalRecord, type Prescription, type Exercise, type Kind } from '../../shared/domain'
+const props = defineProps<{
+  open: boolean
+  kind: Kind
+  record?: LocalRecord
+  parentId?: string
+  catalog: LocalRecord[]
+}>()
+const emit = defineEmits<{
+  close: []
+  save: [kind: Kind, payload: any, id?: string, parentId?: string | null, revision?: number]
+}>()
+const draft = ref<any>({}),
+  error = ref(''),
+  selectedExercise = ref('')
+const prescriptions = computed(() => draft.value.exercises as Prescription[])
+const fields = ['reps', 'load', 'rpe', 'rir', 'tut'] as const
+const modes = [
+  ['bodyweight', 'Corpo libero'],
+  ['weighted', 'Zavorra'],
+  ['external', 'Carico esterno'],
+  ['band', 'Banda elastica'],
+]
+watch(
+  () => props.open,
+  (value) => {
+    if (!value) return
+    error.value = ''
+    selectedExercise.value = ''
+    draft.value = props.record
+      ? JSON.parse(JSON.stringify(props.record.payload))
+      : props.kind === 'exercise'
+        ? { name: '', description: '', notes: '', mode: 'bodyweight', videoUrl: '', videoPath: '' }
+        : props.kind === 'cycle'
+          ? { name: '', notes: '', start: new Date().toISOString().slice(0, 10), weeks: 6 }
+          : props.kind === 'plan'
+            ? { name: '', notes: '', order: 0 }
+            : props.kind === 'weight'
+              ? { kg: 75, measuredAt: new Date().toISOString(), source: 'manual' }
+              : { name: '', notes: '', order: 0, exercises: [] }
+  },
+)
+function addExercise() {
+  const row = props.catalog.find((r) => r.id === selectedExercise.value)
+  if (!row) return
+  const e = row.payload as Exercise
+  draft.value.exercises.push({
+    id: crypto.randomUUID(),
+    exerciseId: row.id,
+    name: e.name,
+    notes: '',
+    mode: e.mode,
+    band: '',
+    alternatives: [],
+    sets: [newTarget(), newTarget(), newTarget()],
+  } satisfies Prescription)
+  selectedExercise.value = ''
+}
+function move(index: number, dir: number) {
+  const list = draft.value.exercises,
+    other = index + dir
+  if (other < 0 || other >= list.length) return
+  ;[list[index], list[other]] = [list[other], list[index]]
+}
+function submit() {
+  emit(
+    'save',
+    props.kind,
+    JSON.parse(JSON.stringify(draft.value)),
+    props.record?.id,
+    props.record?.parent_id ?? props.parentId ?? null,
+    props.record?.localRevision,
+  )
+}
+function clean(set: any, key: string, event: Event) {
+  const value = (event.target as HTMLInputElement).value
+  set[key] = value === '' ? null : Number(value)
+}
 </script>
-<template><AppModal :open="open" :title="record?'PERSONALIZZA IL TUO PERCORSO':'UN NUOVO INIZIO'" :wide="kind==='workout'" @close="emit('close')"><form @submit.prevent="submit"><h2>{{ ({exercise:'Il tuo movimento.',cycle:'La tua direzione.',plan:'La tua scheda.',workout:'La tua giornata.',weight:'Ascolta il tuo corpo.'} as any)[kind] }}</h2><template v-if="kind==='weight'"><label>Peso corporeo (kg)<input v-model.number="draft.kg" type="number" min="1" max="500" step=".1" required></label><p class="notice">Registrazione manuale di adesso. Le sessioni precedenti mantengono il loro peso.</p></template><template v-else><label>Nome<input v-model="draft.name" required maxlength="100" autofocus></label><template v-if="kind==='exercise'"><label>Descrizione<textarea v-model="draft.description" rows="2" maxlength="4000"/></label><label>Tipologia<select v-model="draft.mode"><option v-for="m in modes" :key="m[0]" :value="m[0]">{{ m[1] }}</option></select></label><label>Video dimostrativo · link HTTPS<input v-model="draft.videoUrl" type="url" pattern="https://.*" placeholder="https://…"></label></template><div v-if="kind==='cycle'" class="form-grid"><label>Data di inizio<input v-model="draft.start" type="date" required></label><label>Durata (settimane)<input v-model.number="draft.weeks" type="number" min="1" max="52" required></label></div><label v-if="kind==='plan'||kind==='workout'">Posizione nell’ordine<input v-model.number="draft.order" type="number" min="0" max="1000" required></label><label>{{ kind==='exercise'?'Note generali':'Note della '+(kind==='plan'?'scheda':'programmazione') }}<textarea v-model="draft.notes" rows="2" maxlength="4000"/></label></template>
-<template v-if="kind==='workout'"><div class="add-exercise"><label>Aggiungi dal tuo catalogo<select v-model="selectedExercise"><option value="">Scegli esercizio</option><option v-for="e in catalog" :key="e.id" :value="e.id">{{ (e.payload as Exercise).name }}</option></select></label><button type="button" class="secondary" :disabled="!selectedExercise" @click="addExercise">Aggiungi +</button></div><p v-if="!catalog.length" class="notice">Crea prima i tuoi esercizi nella sezione Esercizi.</p><TransitionGroup name="list" tag="div"><section v-for="(e,i) in prescriptions" :key="e.id" class="prescription-editor"><div class="inline-top"><h3>{{ i+1 }}. {{ e.name }}</h3><div class="button-group"><button type="button" class="icon-btn" aria-label="Sposta sopra" :disabled="i===0" @click="move(i,-1)">↑</button><button type="button" class="icon-btn" aria-label="Sposta sotto" :disabled="i===prescriptions.length-1" @click="move(i,1)">↓</button><button type="button" class="icon-btn" aria-label="Rimuovi esercizio dalla giornata" @click="prescriptions.splice(i,1)">×</button></div></div><label>Note specifiche per questa scheda<textarea v-model="e.notes" rows="2" placeholder="Es. salita esplosiva nella fase di forza"/></label><div class="form-grid"><label>Carico<select v-model="e.mode"><option v-for="m in modes" :key="m[0]" :value="m[0]">{{ m[1] }}</option></select></label><label v-if="e.mode==='band'">Banda / configurazione<input v-model="e.band" maxlength="200" placeholder="Colore, marca, presa…"></label></div><label>Alternative consigliate<select v-model="e.alternatives" multiple class="alternatives"><option v-for="a in catalog.filter(a=>a.id!==e.exerciseId)" :key="a.id" :value="a.id">{{ (a.payload as Exercise).name }}</option></select></label><p class="notice">Target per serie · lascia vuoto se non prescritto</p><div class="target-editor heading"><span>#</span><span>Rep</span><span>Kg</span><span>RPE</span><span>RIR</span><span>TUT s</span><span/></div><div v-for="(s,j) in e.sets" :key="j" class="target-editor"><span>{{ j+1 }}</span><input v-for="k in fields" :key="k" :aria-label="`${e.name} serie ${j+1} target ${k}`" :value="s[k]" type="number" :min="k==='rpe'?1:0" :max="['rpe','rir'].includes(k)?10:2000" :step="['rpe','load'].includes(k)?'.5':1" @input="clean(s,k,$event)"><button type="button" class="icon-btn" aria-label="Rimuovi serie" :disabled="e.sets.length===1" @click="e.sets.splice(j,1)">×</button></div><button type="button" class="text-btn" :disabled="e.sets.length>=30" @click="e.sets.push(newTarget())">+ Aggiungi serie</button></section></TransitionGroup></template><p v-if="error" role="alert">{{ error }}</p><button type="submit" class="primary modal-save">Salva sul dispositivo <GIcon name="check"/></button></form></AppModal></template>
+<template>
+  <AppModal
+    :open="open"
+    :title="record ? 'PERSONALIZZA IL TUO PERCORSO' : 'UN NUOVO INIZIO'"
+    :wide="kind === 'workout'"
+    @close="emit('close')"
+    ><form @submit.prevent="submit">
+      <h2>
+        {{
+          (
+            {
+              exercise: 'Il tuo movimento.',
+              cycle: 'La tua direzione.',
+              plan: 'La tua scheda.',
+              workout: 'La tua giornata.',
+              weight: 'Ascolta il tuo corpo.',
+            } as any
+          )[kind]
+        }}
+      </h2>
+      <template v-if="kind === 'weight'"
+        ><label
+          >Peso corporeo (kg)<input
+            v-model.number="draft.kg"
+            type="number"
+            min="1"
+            max="500"
+            step=".1"
+            required
+        /></label>
+        <p class="notice">
+          Registrazione manuale di adesso. Le sessioni precedenti mantengono il loro peso.
+        </p></template
+      ><template v-else
+        ><label>Nome<input v-model="draft.name" required maxlength="100" autofocus /></label
+        ><template v-if="kind === 'exercise'"
+          ><label>Descrizione<textarea v-model="draft.description" rows="2" maxlength="4000" /></label
+          ><label
+            >Tipologia<select v-model="draft.mode">
+              <option v-for="m in modes" :key="m[0]" :value="m[0]">{{ m[1] }}</option>
+            </select></label
+          ><label
+            >Video dimostrativo · link HTTPS<input
+              v-model="draft.videoUrl"
+              type="url"
+              pattern="https://.*"
+              placeholder="https://…" /></label
+        ></template>
+        <div v-if="kind === 'cycle'" class="form-grid">
+          <label>Data di inizio<input v-model="draft.start" type="date" required /></label
+          ><label
+            >Durata (settimane)<input v-model.number="draft.weeks" type="number" min="1" max="52" required
+          /></label>
+        </div>
+        <label v-if="kind === 'plan' || kind === 'workout'"
+          >Posizione nell’ordine<input
+            v-model.number="draft.order"
+            type="number"
+            min="0"
+            max="1000"
+            required /></label
+        ><label
+          >{{
+            kind === 'exercise'
+              ? 'Note generali'
+              : 'Note della ' + (kind === 'plan' ? 'scheda' : 'programmazione')
+          }}<textarea v-model="draft.notes" rows="2" maxlength="4000" /></label
+      ></template>
+      <template v-if="kind === 'workout'"
+        ><div class="add-exercise">
+          <label
+            >Aggiungi dal tuo catalogo<select v-model="selectedExercise">
+              <option value="">Scegli esercizio</option>
+              <option v-for="e in catalog" :key="e.id" :value="e.id">
+                {{ (e.payload as Exercise).name }}
+              </option>
+            </select></label
+          ><button type="button" class="secondary" :disabled="!selectedExercise" @click="addExercise">
+            Aggiungi +
+          </button>
+        </div>
+        <p v-if="!catalog.length" class="notice">Crea prima i tuoi esercizi nella sezione Esercizi.</p>
+        <TransitionGroup name="list" tag="div"
+          ><section v-for="(e, i) in prescriptions" :key="e.id" class="prescription-editor">
+            <div class="inline-top">
+              <h3>{{ i + 1 }}. {{ e.name }}</h3>
+              <div class="button-group">
+                <button
+                  type="button"
+                  class="icon-btn"
+                  aria-label="Sposta sopra"
+                  :disabled="i === 0"
+                  @click="move(i, -1)"
+                >
+                  ↑</button
+                ><button
+                  type="button"
+                  class="icon-btn"
+                  aria-label="Sposta sotto"
+                  :disabled="i === prescriptions.length - 1"
+                  @click="move(i, 1)"
+                >
+                  ↓</button
+                ><button
+                  type="button"
+                  class="icon-btn"
+                  aria-label="Rimuovi esercizio dalla giornata"
+                  @click="prescriptions.splice(i, 1)"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+            <label
+              >Note specifiche per questa scheda<textarea
+                v-model="e.notes"
+                rows="2"
+                placeholder="Es. salita esplosiva nella fase di forza"
+              />
+            </label>
+            <div class="form-grid">
+              <label
+                >Carico<select v-model="e.mode">
+                  <option v-for="m in modes" :key="m[0]" :value="m[0]">{{ m[1] }}</option>
+                </select></label
+              ><label v-if="e.mode === 'band'"
+                >Banda / configurazione<input
+                  v-model="e.band"
+                  maxlength="200"
+                  placeholder="Colore, marca, presa…"
+              /></label>
+            </div>
+            <label
+              >Alternative consigliate<select v-model="e.alternatives" multiple class="alternatives">
+                <option v-for="a in catalog.filter((a) => a.id !== e.exerciseId)" :key="a.id" :value="a.id">
+                  {{ (a.payload as Exercise).name }}
+                </option>
+              </select></label
+            >
+            <p class="notice">Target per serie · lascia vuoto se non prescritto</p>
+            <div class="target-editor heading">
+              <span>#</span><span>Rep</span><span>Kg</span><span>RPE</span><span>RIR</span><span>TUT s</span
+              ><span />
+            </div>
+            <div v-for="(s, j) in e.sets" :key="j" class="target-editor">
+              <span>{{ j + 1 }}</span
+              ><input
+                v-for="k in fields"
+                :key="k"
+                :aria-label="`${e.name} serie ${j + 1} target ${k}`"
+                :value="s[k]"
+                type="number"
+                :min="k === 'rpe' ? 1 : 0"
+                :max="['rpe', 'rir'].includes(k) ? 10 : 2000"
+                :step="['rpe', 'load'].includes(k) ? '.5' : 1"
+                @input="clean(s, k, $event)"
+              /><button
+                type="button"
+                class="icon-btn"
+                aria-label="Rimuovi serie"
+                :disabled="e.sets.length === 1"
+                @click="e.sets.splice(j, 1)"
+              >
+                ×
+              </button>
+            </div>
+            <button
+              type="button"
+              class="text-btn"
+              :disabled="e.sets.length >= 30"
+              @click="e.sets.push(newTarget())"
+            >
+              + Aggiungi serie
+            </button>
+          </section></TransitionGroup
+        ></template
+      >
+      <p v-if="error" role="alert">{{ error }}</p>
+      <button type="submit" class="primary modal-save">
+        Salva sul dispositivo <GIcon name="check" />
+      </button></form
+  ></AppModal>
+</template>

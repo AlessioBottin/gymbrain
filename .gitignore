@@ -2,6 +2,7 @@ node_modules/
 .npm-cache/
 .nuxt/
 .output/
+dist/
 .data/
 .env
 .env.*
@@ -17,3 +18,4 @@ DATABASE-SERVER-READY.txt
 scripts/connect-chrome-agent.ps1
 test-results/
 playwright-report/
+RENDER-READY.txt

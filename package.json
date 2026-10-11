@@ -9,25 +9,20 @@
     "dev:web": "nuxt dev --host 127.0.0.1",
     "build": "node scripts/icons.mjs && nuxt generate",
     "start": "node --env-file-if-exists=.env --import tsx backend/index.ts",
-    "typecheck": "nuxt typecheck",
+    "typecheck": "nuxt typecheck && tsc -p tsconfig.server.json",
     "test": "node --import tsx --test tests/*.test.ts",
     "test:e2e": "playwright test",
     "generate": "nuxt generate",
-    "preview": "nuxt preview"
+    "preview": "nuxt preview",
+    "test:live": "node --env-file=.env --import tsx scripts/live-smoke.ts"
   },
   "dependencies": {
     "@fastify/helmet": "^13.1.2",
     "@fastify/rate-limit": "^11.2.1",
     "@fastify/static": "^10.1.6",
-    "@fontsource/dm-sans": "^5.3.0",
-    "@fontsource/manrope": "^5.3.0",
     "@supabase/supabase-js": "^2.117.3",
-    "@vite-pwa/nuxt": "^1.1.1",
-    "dexie": "^4.4.6",
     "fastify": "^5.12.5",
-    "nuxt": "^4.6.1",
-    "vue": "^3.5.43",
-    "vue-router": "^4.6.4",
+    "tsx": "^4.23.15",
     "zod": "^4.6.6"
   },
   "engines": {
@@ -35,13 +30,23 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
+    "@fontsource/dm-sans": "^5.3.0",
+    "@fontsource/manrope": "^5.3.0",
     "@playwright/test": "^1.64.0",
     "@types/node": "^26.6.5",
+    "@vite-pwa/nuxt": "^1.1.1",
     "concurrently": "^10.0.6",
+    "dexie": "^4.4.6",
     "fake-indexeddb": "^6.2.5",
+    "nuxt": "^4.6.1",
+    "prettier": "^3.6.2",
     "sharp": "^0.35.5",
-    "tsx": "^4.23.15",
     "typescript": "^5.9.3",
+    "vue": "^3.5.43",
+    "vue-router": "^4.6.4",
     "vue-tsc": "^3.3.13"
+  },
+  "overrides": {
+    "@simple-git/argv-parser": "2.0.1"
   }
 }

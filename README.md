@@ -73,6 +73,10 @@ npm run test:e2e
 
 Test Node: contratti `inject`/HTTP, isolamento nel gateway, assegnazione server del proprietario, PostgreSQL locale via PGlite (migrazioni, grant, gerarchia, idempotenza, conflitti), IndexedDB e snapshot. Test Playwright su Chrome: desktop/mobile, sessione recuperata dopo reload offline, sostituzioni, editor scheda, creazione esercizi e overflow mobile. Test browser su contesti isolati, senza utilizzare il profilo personale Chrome.
 
+Il controllo cloud facoltativo `scripts/live-smoke.ts` richiede `RUN_LIVE_TESTS=yes` e `.env`: crea due account temporanei marcati (senza inviare email), verifica le API reali e li elimina con i soli dati del test. Anche `tests/e2e/live.spec.ts` richiede l'opt-in; verifica nel browser login reale, sincronizzazione, ricaricamento offline con sessione scaduta e invio delle modifiche al ritorno online.
+
+Il deploy rimuove le dipendenze di sviluppo dopo la build. Audit delle dipendenze di produzione: nessuna vulnerabilità rilevata alla verifica del 11 ottobre 2026. Restano advisory nelle dipendenze degli strumenti di build Nuxt; non vengono incluse nel processo Fastify distribuito.
+
 ## Limiti ancora aperti
 
 - Importazione Withings/WHOOP non collegata: richiede registrazione OAuth del fornitore; il peso manuale è funzionante.

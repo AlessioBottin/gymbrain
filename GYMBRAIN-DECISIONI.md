@@ -2,7 +2,7 @@
 
 Data: 11 ottobre 2026.
 
-Questo documento raccoglie le decisioni della conversazione e distingue le scelte confermate dalle proposte ancora da definire. Applicazione, integrazioni e servizi cloud non sono ancora implementati.
+Questo documento raccoglie le decisioni della conversazione e distingue le scelte confermate dalle proposte ancora da definire. La prima implementazione Nuxt/Vue/Fastify e il database Supabase sono realizzati; stato di deploy e limiti correnti sono descritti in README.md. Le integrazioni del peso richiedono ancora configurazione OAuth.
 
 ## Obiettivo
 
@@ -94,17 +94,19 @@ pnpm è stato proposto, ma non ancora confermato come package manager. Bun non �
 
 ## Database unico e isolamento utenti
 
-**Un solo PostgreSQL condiviso su Supabase**, non un database per utente.
+**Un solo PostgreSQL condiviso su Supabase**, gestito dal proprietario del progetto. Tutti gli utenti usano questo stesso database.
 
-- Ogni record personale è associato al proprietario.
-- Fastify deriva l'identità da un token verificato, senza fidarsi di un `user_id` ricevuto nel payload.
-- Row Level Security come ulteriore barriera sul database.
-- Il normale accesso backend deve rispettare le policy: ruoli appropriati e identità limitata alla transazione, senza contaminazioni fra connessioni del pool.
-- Vincoli sulle relazioni impediscono riferimenti a record di proprietari diversi.
-- Stessa separazione per allegati e cache locale.
-- Nessuna chiave amministrativa nel frontend.
+Decisione aggiornata esplicitamente dall'utente il 11 ottobre 2026: **autorizzazione soltanto lato server Fastify**, senza policy RLS per i dati applicativi. Questa scelta sostituisce la proposta precedente di isolamento RLS.
 
-Supabase Auth gestisce gli account. Metodo di login ancora da scegliere: Google è stato proposto; email/password richiede un servizio SMTP configurato per conferme e recupero password, perché quello predefinito Supabase non invia liberamente agli amici.
+- Il browser usa Supabase Auth per il login, ma non ha permessi sulle tabelle o sulle RPC dati.
+- Fastify verifica il token e ricava l'utente; non accetta un proprietario dal payload o da header client.
+- Tutte le letture sono filtrate per proprietario; le mutazioni ricevono l'identit? verificata dal backend.
+- `SUPABASE_SECRET_KEY` resta soltanto sul server. La chiave pubblica nel frontend non concede accesso diretto ai dati.
+- Storage privato, URL temporanei per upload/download autorizzati dal backend.
+- Cache IndexedDB separata per account; ? una copia locale per l'offline, non un altro database cloud.
+- Le migrazioni 001 e 002 registrano l'evoluzione: 002 revoca l'accesso client e applica lo stato finale scelto.
+
+Login implementato con email/password, conferma e recupero password. Serve configurare SMTP per l'invio agli amici; non viene disabilitata la conferma email come scorciatoia.
 
 ## Integrazioni del peso
 
