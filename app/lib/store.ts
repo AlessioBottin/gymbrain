@@ -28,6 +28,26 @@ export class GymDB extends Dexie {
       queue: '++seq,owner,[owner+module]',
       meta: 'key',
     })
+    this.version(2)
+      .stores({
+        records: '[user_id+id],user_id,[user_id+kind]',
+        queue: '++seq,owner,[owner+module]',
+        meta: 'key',
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table('records')
+          .toCollection()
+          .modify((row: LocalRecord) => {
+            const parsed = schemas[row.kind].safeParse(row.payload)
+            if (parsed.success) row.payload = parsed.data
+            if (row.conflict) {
+              const remote = schemas[row.conflict.kind].safeParse(row.conflict.payload)
+              if (remote.success) row.conflict.payload = remote.data
+            }
+          })
+        // Queued requests and operation IDs stay immutable: retries must retain their exact payload.
+      })
   }
 }
 export const db = new GymDB()
@@ -35,7 +55,12 @@ export async function saveRecord(
   owner: string,
   kind: Kind,
   payload: Payload,
-  options: { id?: string; parentId?: string | null; deleted?: boolean; expectedRevision?: number } = {},
+  options: {
+    id?: string
+    parentId?: string | null
+    deleted?: boolean
+    expectedRevision?: number
+  } = {},
 ) {
   const valid = schemas[kind].parse(payload),
     id = options.id || crypto.randomUUID(),
@@ -43,12 +68,17 @@ export async function saveRecord(
   return db.transaction('rw', db.records, db.queue, async () => {
     const previous = await db.records.get([owner, id])
     if (previous?.conflict) throw new Error('Risolvi prima il conflitto per questo elemento.')
-    if (options.expectedRevision !== undefined && previous?.localRevision !== options.expectedRevision)
+    if (
+      options.expectedRevision !== undefined &&
+      previous?.localRevision !== options.expectedRevision
+    )
       throw new Error('Elemento modificato in un’altra finestra. Riaprilo prima di salvare.')
     const pending = (await db.queue.where('owner').equals(owner).toArray())
       .filter((o) => o.mutation.id === id)
       .sort((a, b) => a.seq! - b.seq!)
-    const baseVersion = pending.length ? pending.at(-1)!.mutation.baseVersion + 1 : previous?.version || 0
+    const baseVersion = pending.length
+      ? pending.at(-1)!.mutation.baseVersion + 1
+      : previous?.version || 0
     const row: LocalRecord = {
       id,
       user_id: owner,
@@ -82,6 +112,7 @@ export async function saveRecord(
   })
 }
 export async function acknowledge(owner: string, op: Operation, remote: RecordRow) {
+  remote.payload = schemas[remote.kind].parse(remote.payload)
   await db.transaction('rw', db.records, db.queue, async () => {
     const row = await db.records.get([owner, remote.id])
     await db.queue.delete(op.seq!)
@@ -132,7 +163,8 @@ export async function removeAccountCache(owner: string) {
   await db.transaction('rw', db.records, db.queue, db.meta, async () => {
     await db.records.where('user_id').equals(owner).delete()
     await db.queue.where('owner').equals(owner).delete()
-    for (const m of await db.meta.toArray()) if (m.key.startsWith(owner + ':')) await db.meta.delete(m.key)
+    for (const m of await db.meta.toArray())
+      if (m.key.startsWith(owner + ':')) await db.meta.delete(m.key)
   })
 }
 export async function synchronize(
@@ -162,8 +194,11 @@ export async function synchronize(
       })
       const data = await r.json()
       if (r.status === 401)
-        throw new Error('Sessione scaduta: accedi per sincronizzare. I dati locali restano salvati.')
-      if (!r.ok && r.status !== 409) throw new Error(data.error || 'Sincronizzazione non disponibile')
+        throw new Error(
+          'Sessione scaduta: accedi per sincronizzare. I dati locali restano salvati.',
+        )
+      if (!r.ok && r.status !== 409)
+        throw new Error(data.error || 'Sincronizzazione non disponibile')
       return { data, status: r.status }
     }
     setStatus('Sincronizzazione…')
@@ -171,7 +206,10 @@ export async function synchronize(
       // Training precedes tracking. Queue payloads and operation IDs never change on retry.
       for (const module of ['training', 'tracking'] as Module[]) {
         const blocked = new Set<string>()
-        for (const op of await db.queue.where('[owner+module]').equals([owner, module]).sortBy('seq')) {
+        for (const op of await db.queue
+          .where('[owner+module]')
+          .equals([owner, module])
+          .sortBy('seq')) {
           if (blocked.has(op.mutation.id)) continue
           const local = await db.records.get([owner, op.mutation.id])
           if (local?.conflict) {
@@ -180,7 +218,10 @@ export async function synchronize(
           }
           const { data, status } = await request(module + '/mutations', op.mutation)
           if (status === 409) {
-            if (data.record && local) await db.records.update([owner, local.id], { conflict: data.record })
+            if (data.record && local) {
+              data.record.payload = schemas[data.record.kind as Kind].parse(data.record.payload)
+              await db.records.update([owner, local.id], { conflict: data.record })
+            }
             blocked.add(op.mutation.id)
             continue
           }
@@ -193,10 +234,14 @@ export async function synchronize(
           await db.transaction('rw', db.records, db.meta, async () => {
             for (const row of data.records as RecordRow[]) {
               if (row.user_id !== owner) throw new Error('Identità inattesa nella risposta')
-              schemas[row.kind].parse(row.payload)
+              row.payload = schemas[row.kind].parse(row.payload)
               const local = await db.records.get([owner, row.id])
               if (!local?.dirty && (!local || row.version > local.version))
-                await db.records.put({ ...row, module, localRevision: (local?.localRevision || 0) + 1 })
+                await db.records.put({
+                  ...row,
+                  module,
+                  localRevision: (local?.localRevision || 0) + 1,
+                })
             }
             await db.meta.put({ key, value: data.cursor })
           })
@@ -207,7 +252,11 @@ export async function synchronize(
       const count = await db.queue.where('owner').equals(owner).count()
       setStatus(count ? 'Modifiche in attesa · controlla i conflitti' : 'Sincronizzato')
     } catch (e) {
-      setStatus(e instanceof Error ? e.message : 'Connessione non disponibile. Dati salvati sul dispositivo.')
+      setStatus(
+        e instanceof Error
+          ? e.message
+          : 'Connessione non disponibile. Dati salvati sul dispositivo.',
+      )
     }
   }
   if (navigator.locks)

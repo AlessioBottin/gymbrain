@@ -1,5 +1,13 @@
 <script setup lang="ts">
-import { newTarget, type LocalRecord, type Prescription, type Exercise, type Kind } from '../../shared/domain'
+import {
+  newTarget,
+  exerciseSchema,
+  workoutSchema,
+  type LocalRecord,
+  type Prescription,
+  type Exercise,
+  type Kind,
+} from '../../shared/domain'
 const props = defineProps<{
   open: boolean
   kind: Kind
@@ -29,9 +37,25 @@ watch(
     error.value = ''
     selectedExercise.value = ''
     draft.value = props.record
-      ? JSON.parse(JSON.stringify(props.record.payload))
+      ? JSON.parse(
+          JSON.stringify(
+            props.kind === 'exercise'
+              ? exerciseSchema.parse(props.record.payload)
+              : props.kind === 'workout'
+                ? workoutSchema.parse(props.record.payload)
+                : props.record.payload,
+          ),
+        )
       : props.kind === 'exercise'
-        ? { name: '', description: '', notes: '', mode: 'bodyweight', videoUrl: '', videoPath: '' }
+        ? {
+            name: '',
+            description: '',
+            notes: '',
+            exerciseType: 'bodyweight',
+            variants: [],
+            videoUrl: '',
+            videoPath: '',
+          }
         : props.kind === 'cycle'
           ? { name: '', notes: '', start: new Date().toISOString().slice(0, 10), weeks: 6 }
           : props.kind === 'plan'
@@ -50,12 +74,29 @@ function addExercise() {
     exerciseId: row.id,
     name: e.name,
     notes: '',
-    mode: e.mode,
+    mode: e.exerciseType === 'weights' ? 'external' : 'bodyweight',
+    exerciseType: e.exerciseType,
+    variant: null,
+    assistance: [],
     band: '',
     alternatives: [],
     sets: [newTarget(), newTarget(), newTarget()],
   } satisfies Prescription)
   selectedExercise.value = ''
+}
+function addVariant() {
+  draft.value.variants.push({ id: crypto.randomUUID(), name: '', notes: '' })
+}
+function variantsFor(id: string) {
+  return (props.catalog.find((r) => r.id === id)?.payload as Exercise | undefined)?.variants || []
+}
+function chooseVariant(e: Prescription, id: string) {
+  const variant = variantsFor(e.exerciseId).find((v) => v.id === id)
+  e.variant = variant ? { ...variant } : null
+}
+function setLoad(e: Prescription, event: Event) {
+  const value = (event.target as HTMLInputElement).value
+  for (const set of e.sets) set.load = value === '' ? null : Number(value)
 }
 function move(index: number, dir: number) {
   const list = draft.value.exercises,
@@ -64,6 +105,7 @@ function move(index: number, dir: number) {
   ;[list[index], list[other]] = [list[other], list[index]]
 }
 function submit() {
+  if (props.kind === 'exercise') delete draft.value.mode
   emit(
     'save',
     props.kind,
@@ -84,7 +126,7 @@ function clean(set: any, key: string, event: Event) {
     :title="record ? 'PERSONALIZZA IL TUO PERCORSO' : 'UN NUOVO INIZIO'"
     :wide="kind === 'workout'"
     @close="emit('close')"
-    ><form @submit.prevent="submit">
+    ><form v-if="open" @submit.prevent="submit">
       <h2>
         {{
           (
@@ -114,12 +156,44 @@ function clean(set: any, key: string, event: Event) {
       ><template v-else
         ><label>Nome<input v-model="draft.name" required maxlength="100" autofocus /></label
         ><template v-if="kind === 'exercise'"
-          ><label>Descrizione<textarea v-model="draft.description" rows="2" maxlength="4000" /></label
           ><label
-            >Tipologia<select v-model="draft.mode">
-              <option v-for="m in modes" :key="m[0]" :value="m[0]">{{ m[1] }}</option>
+            >Descrizione<textarea v-model="draft.description" rows="2" maxlength="4000" /></label
+          ><label
+            >Tipologia esercizio<select v-model="draft.exerciseType">
+              <option value="bodyweight">Corpo libero</option>
+              <option value="weights">Pesi</option>
             </select></label
-          ><label
+          >
+          <fieldset class="assistance-picker">
+            <legend>Varianti del movimento</legend>
+            <p class="notice">
+              Per esempio HSPU con variante Deep. Il sovraccarico si imposta nella scheda.
+            </p>
+            <div v-for="(variant, i) in draft.variants" :key="variant.id" class="variant-editor">
+              <label
+                >Nome variante<input
+                  v-model="variant.name"
+                  required
+                  maxlength="100"
+                  placeholder="Deep / profondo"
+              /></label>
+              <label
+                >Note variante<textarea v-model="variant.notes" maxlength="4000" rows="2" />
+              </label>
+              <button type="button" class="text-btn" @click="draft.variants.splice(i, 1)">
+                Rimuovi variante
+              </button>
+            </div>
+            <button
+              type="button"
+              class="secondary"
+              :disabled="draft.variants.length >= 30"
+              @click="addVariant"
+            >
+              Aggiungi variante +
+            </button>
+          </fieldset>
+          <label
             >Video dimostrativo · link HTTPS<input
               v-model="draft.videoUrl"
               type="url"
@@ -129,7 +203,12 @@ function clean(set: any, key: string, event: Event) {
         <div v-if="kind === 'cycle'" class="form-grid">
           <label>Data di inizio<input v-model="draft.start" type="date" required /></label
           ><label
-            >Durata (settimane)<input v-model.number="draft.weeks" type="number" min="1" max="52" required
+            >Durata (settimane)<input
+              v-model.number="draft.weeks"
+              type="number"
+              min="1"
+              max="52"
+              required
           /></label>
         </div>
         <label v-if="kind === 'plan' || kind === 'workout'"
@@ -155,11 +234,18 @@ function clean(set: any, key: string, event: Event) {
                 {{ (e.payload as Exercise).name }}
               </option>
             </select></label
-          ><button type="button" class="secondary" :disabled="!selectedExercise" @click="addExercise">
+          ><button
+            type="button"
+            class="secondary"
+            :disabled="!selectedExercise"
+            @click="addExercise"
+          >
             Aggiungi +
           </button>
         </div>
-        <p v-if="!catalog.length" class="notice">Crea prima i tuoi esercizi nella sezione Esercizi.</p>
+        <p v-if="!catalog.length" class="notice">
+          Crea prima i tuoi esercizi nella sezione Esercizi.
+        </p>
         <TransitionGroup name="list" tag="div"
           ><section v-for="(e, i) in prescriptions" :key="e.id" class="prescription-editor">
             <div class="inline-top">
@@ -198,29 +284,72 @@ function clean(set: any, key: string, event: Event) {
                 placeholder="Es. salita esplosiva nella fase di forza"
               />
             </label>
-            <div class="form-grid">
-              <label
-                >Carico<select v-model="e.mode">
-                  <option v-for="m in modes" :key="m[0]" :value="m[0]">{{ m[1] }}</option>
-                </select></label
-              ><label v-if="e.mode === 'band'"
-                >Banda / configurazione<input
-                  v-model="e.band"
-                  maxlength="200"
-                  placeholder="Colore, marca, presa…"
-              /></label>
-            </div>
             <label
-              >Alternative consigliate<select v-model="e.alternatives" multiple class="alternatives">
-                <option v-for="a in catalog.filter((a) => a.id !== e.exerciseId)" :key="a.id" :value="a.id">
+              >Variante del movimento<select
+                :value="e.variant?.id || ''"
+                @change="chooseVariant(e, ($event.target as HTMLSelectElement).value)"
+              >
+                <option value="">Standard</option>
+                <option
+                  v-if="e.variant && !variantsFor(e.exerciseId).some((v) => v.id === e.variant?.id)"
+                  :value="e.variant.id"
+                >
+                  {{ e.variant.name }} (salvata nella scheda)
+                </option>
+                <option v-for="v in variantsFor(e.exerciseId)" :key="v.id" :value="v.id">
+                  {{ v.name }}
+                </option>
+              </select></label
+            >
+            <p v-if="e.variant?.notes" class="notice">{{ e.variant.notes }}</p>
+            <p class="subtle">
+              {{
+                e.exerciseType === 'bodyweight'
+                  ? 'Corpo libero · sovraccarico per serie in kg'
+                  : 'Pesi · carico per serie in kg'
+              }}
+            </p>
+            <label
+              >{{ e.exerciseType === 'bodyweight' ? 'Sovraccarico (kg)' : 'Carico (kg)'
+              }}<input
+                type="number"
+                min="0"
+                max="2000"
+                step="0.5"
+                :value="e.sets[0]?.load ?? ''"
+                placeholder="Nessuno"
+                @input="setLoad(e, $event)"
+            /></label>
+            <p class="notice">
+              Imposta tutte le serie; puoi poi modificare i kg di ciascuna serie qui sotto.
+            </p>
+            <AssistancePicker v-if="e.exerciseType === 'bodyweight'" v-model="e.assistance" />
+            <label v-if="e.exerciseType === 'bodyweight'"
+              >Banda / configurazione<input
+                v-model="e.band"
+                maxlength="200"
+                placeholder="Punto di ancoraggio, piede o ginocchio, eventuale altra banda"
+            /></label>
+            <label
+              >Alternative consigliate<select
+                v-model="e.alternatives"
+                multiple
+                class="alternatives"
+              >
+                <option
+                  v-for="a in catalog.filter((a) => a.id !== e.exerciseId)"
+                  :key="a.id"
+                  :value="a.id"
+                >
                   {{ (a.payload as Exercise).name }}
                 </option>
               </select></label
             >
             <p class="notice">Target per serie · lascia vuoto se non prescritto</p>
             <div class="target-editor heading">
-              <span>#</span><span>Rep</span><span>Kg</span><span>RPE</span><span>RIR</span><span>TUT s</span
-              ><span />
+              <span>#</span><span>Rep</span
+              ><span>{{ e.exerciseType === 'bodyweight' ? '+ Kg' : 'Kg' }}</span
+              ><span>RPE</span><span>RIR</span><span>TUT s</span><span />
             </div>
             <div v-for="(s, j) in e.sets" :key="j" class="target-editor">
               <span>{{ j + 1 }}</span

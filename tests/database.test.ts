@@ -12,7 +12,9 @@ test('SQL migration chain: server-only grants, owner scoping, hierarchy, retries
       `create role anon; create role authenticated; create role service_role; create schema auth; create table auth.users(id uuid primary key); create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$; grant usage on schema auth to authenticated; grant execute on function auth.uid() to authenticated; create schema storage; create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]); create table storage.objects(id uuid,name text,bucket_id text); alter table storage.objects enable row level security; create function storage.foldername(text) returns text[] language sql as $$ select string_to_array($1,'/') $$; insert into auth.users values('${alice}'),('${bob}');`,
     )
     await pg.exec(await readFile('supabase/migrations/202610110001_core.sql', 'utf8'))
-    await pg.exec(`set role authenticated; select set_config('request.jwt.claim.sub','${alice}',false);`)
+    await pg.exec(
+      `set role authenticated; select set_config('request.jwt.claim.sub','${alice}',false);`,
+    )
     const call = async (
       id: string,
       base: number,
@@ -57,12 +59,20 @@ test('SQL migration chain: server-only grants, owner scoping, hierarchy, retries
       'Forza 2',
     )
     await pg.exec('reset role; set role anon;')
-    await assert.rejects(() => pg.query('select * from public.training_records'), /permission denied/)
+    await assert.rejects(
+      () => pg.query('select * from public.training_records'),
+      /permission denied/,
+    )
     await assert.rejects(() => call(cycle, 0, 'anon'), /permission denied/)
     await pg.exec('reset role;')
-    await pg.exec(await readFile('supabase/migrations/202610110002_server_authorization.sql', 'utf8'))
+    await pg.exec(
+      await readFile('supabase/migrations/202610110002_server_authorization.sql', 'utf8'),
+    )
     await pg.exec('set role authenticated;')
-    await assert.rejects(() => pg.query('select * from public.training_records'), /permission denied/)
+    await assert.rejects(
+      () => pg.query('select * from public.training_records'),
+      /permission denied/,
+    )
     await assert.rejects(() => call(cycle, 2, 'Bypass legacy endpoint'), /permission denied/)
     await assert.rejects(
       () =>
@@ -81,9 +91,77 @@ test('SQL migration chain: server-only grants, owner scoping, hierarchy, retries
     assert.equal(result.rows[0].value.record.user_id, alice)
     assert.equal(result.rows[0].value.record.version, 3)
     assert.equal(
-      (await pg.query<any>('select payload from public.training_records where user_id=$1', [bob])).rows[0]
-        .payload.name,
+      (await pg.query<any>('select payload from public.training_records where user_id=$1', [bob]))
+        .rows[0].payload.name,
       'Bob private',
+    )
+    const legacyId = crypto.randomUUID(),
+      legacy = {
+        name: 'Panca',
+        mode: 'external',
+        description: 'Descrizione',
+        notes: 'Da conservare',
+        videoUrl: 'https://example.com/video',
+        videoPath: '',
+      }
+    await pg.query(
+      "insert into public.training_records(user_id,id,kind,payload) values($1,$2,'exercise',$3)",
+      [alice, legacyId, legacy],
+    )
+    const historical = {
+      exercises: [{ name: 'Pull-up', mode: 'weighted', band: '', actual: [{ load: 12 }] }],
+    }
+    await pg.query(
+      "insert into public.tracking_records(user_id,id,kind,payload) values($1,$2,'session',$3)",
+      [alice, crypto.randomUUID(), historical],
+    )
+    await pg.exec('reset role')
+    await pg.exec(await readFile('supabase/migrations/202610110004_exercise_variants.sql', 'utf8'))
+    const migrated = (
+      await pg.query<any>('select * from public.training_records where user_id=$1 and id=$2', [
+        alice,
+        legacyId,
+      ])
+    ).rows[0]
+    assert.equal(migrated.payload.mode, undefined)
+    assert.equal(migrated.payload.exerciseType, 'weights')
+    assert.deepEqual(migrated.payload.variants, [])
+    assert.equal(migrated.payload.notes, legacy.notes)
+    assert.equal(migrated.payload.videoUrl, legacy.videoUrl)
+    assert.equal(migrated.version, 2)
+    assert.deepEqual(
+      (
+        await pg.query<any>(
+          'select original_record from public.catalog_v2_backup where user_id=$1',
+          [alice],
+        )
+      ).rows[0].original_record.payload,
+      legacy,
+    )
+    assert.deepEqual(
+      (await pg.query<any>("select payload from public.tracking_records where kind='session'"))
+        .rows[0].payload,
+      historical,
+    )
+    await pg.exec('set role service_role')
+    await pg.query('update public.training_records set payload=$1 where user_id=$2 and id=$3', [
+      { ...legacy, mode: 'weighted' },
+      alice,
+      legacyId,
+    ])
+    assert.equal(
+      (
+        await pg.query<any>(
+          'select payload from public.training_records where user_id=$1 and id=$2',
+          [alice, legacyId],
+        )
+      ).rows[0].payload.exerciseType,
+      'bodyweight',
+    )
+    await pg.exec('reset role; set role authenticated')
+    await assert.rejects(
+      () => pg.query('select * from public.catalog_v2_backup'),
+      /permission denied/,
     )
   } finally {
     await pg.close()

@@ -1,9 +1,71 @@
 import 'fake-indexeddb/auto'
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { db, saveRecord, acknowledge, resolveConflict } from '../app/lib/store.ts'
+import { db, GymDB, saveRecord, acknowledge, resolveConflict } from '../app/lib/store.ts'
+import Dexie from 'dexie'
 import { snapshotSession, type LocalRecord } from '../shared/domain.ts'
 after(async () => db.delete())
+
+test('Offline catalog migration preserves queued retry bytes and upgrades existing cache', async () => {
+  const name = 'migration-' + crypto.randomUUID(),
+    old = new Dexie(name)
+  old
+    .version(1)
+    .stores({
+      records: '[user_id+id],user_id,[user_id+kind]',
+      queue: '++seq,owner,[owner+module]',
+      meta: 'key',
+    })
+  const row = {
+    id: crypto.randomUUID(),
+    user_id: 'alice',
+    kind: 'exercise',
+    module: 'training',
+    parent_id: null,
+    payload: {
+      name: 'Pull-up',
+      description: '',
+      notes: '',
+      mode: 'weighted',
+      videoUrl: '',
+      videoPath: '',
+    },
+    version: 2,
+    revision: 4,
+    localRevision: 3,
+    deleted: false,
+    dirty: true,
+    updated_at: new Date().toISOString(),
+  }
+  const operation = {
+    owner: 'alice',
+    module: 'training',
+    localRevision: 3,
+    mutation: {
+      operationId: crypto.randomUUID(),
+      id: row.id,
+      kind: 'exercise',
+      parentId: null,
+      baseVersion: 2,
+      payload: row.payload,
+      deleted: false,
+    },
+  }
+  await old.table('records').put(row)
+  await old.table('queue').add(operation)
+  const before = await old.table('queue').toArray()
+  old.close()
+  const upgraded = new GymDB(name)
+  try {
+    const record = await upgraded.records.get(['alice', row.id])
+    assert.equal((record!.payload as any).exerciseType, 'bodyweight')
+    assert.deepEqual((record!.payload as any).variants, [])
+    assert.equal(record!.localRevision, 3)
+    assert.deepEqual(await upgraded.queue.toArray(), before)
+  } finally {
+    await upgraded.delete()
+  }
+})
 test('Atomic local queue, isolation, immutable retry payload and acknowledgement during edits', async () => {
   const payload = {
     name: 'Pull-up',

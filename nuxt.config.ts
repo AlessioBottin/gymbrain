@@ -13,6 +13,7 @@ export default defineNuxtConfig({
   nitro: { devProxy: { '/api': { target: 'http://127.0.0.1:3001/api', changeOrigin: true } } },
   pwa: {
     registerType: 'prompt',
+    injectRegister: false,
     manifest: {
       name: 'Gymbrain',
       short_name: 'Gymbrain',
@@ -33,8 +34,9 @@ export default defineNuxtConfig({
       navigateFallback: '/',
       navigateFallbackDenylist: [/^\/api\//],
       cleanupOutdatedCaches: true,
+      clientsClaim: true,
     },
-    client: { installPrompt: true },
+    client: { registerPlugin: false },
   },
   css: ['~/assets/main.css', '~/assets/application.css'],
   app: {

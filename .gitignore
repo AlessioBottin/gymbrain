@@ -19,3 +19,4 @@ scripts/connect-chrome-agent.ps1
 test-results/
 playwright-report/
 RENDER-READY.txt
+WITHINGS-READY.txt

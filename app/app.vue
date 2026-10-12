@@ -45,6 +45,19 @@ const rows = ref<LocalRecord[]>([]),
   workoutId = ref(''),
   sessionRecord = ref<LocalRecord | null>(null),
   focusMode = ref(false)
+const withings = useWithings(auth, owner, local, online, sync)
+const updates = useAppUpdates(
+  computed(
+    () =>
+      !ready.value ||
+      !owner.value ||
+      focusMode.value ||
+      busy.value ||
+      withings.loading.value ||
+      reauth.value ||
+      recovery.value,
+  ),
+)
 const editor = reactive<{ open: boolean; kind: Kind; record?: LocalRecord; parentId?: string }>({
     open: false,
     kind: 'exercise',
@@ -68,16 +81,22 @@ const catalog = computed(() => rows.value.filter((r) => r.kind === 'exercise' &&
       .filter((r) => r.kind === 'workout' && r.parent_id === plan.value?.id && !r.deleted)
       .sort((a, b) => (a.payload as Workout).order - (b.payload as Workout).order),
   ),
-  workout = computed(() => workouts.value.find((r) => r.id === workoutId.value) || workouts.value[0]),
+  workout = computed(
+    () => workouts.value.find((r) => r.id === workoutId.value) || workouts.value[0],
+  ),
   workoutData = computed(() => workout.value?.payload as Workout | undefined)
 const sessions = computed(() =>
     rows.value
       .filter((r) => r.kind === 'session' && !r.deleted)
       .sort((a, b) =>
-        (b.payload as TrainingSession).startedAt.localeCompare((a.payload as TrainingSession).startedAt),
+        (b.payload as TrainingSession).startedAt.localeCompare(
+          (a.payload as TrainingSession).startedAt,
+        ),
       ),
   ),
-  completed = computed(() => sessions.value.filter((r) => (r.payload as TrainingSession).completedAt)),
+  completed = computed(() =>
+    sessions.value.filter((r) => (r.payload as TrainingSession).completedAt),
+  ),
   ongoing = computed(() => sessions.value.find((r) => !(r.payload as TrainingSession).completedAt)),
   weights = computed(() =>
     rows.value
@@ -85,7 +104,10 @@ const sessions = computed(() =>
       .sort((a, b) => (a.payload as any).measuredAt.localeCompare((b.payload as any).measuredAt)),
   ),
   latestWeight = computed(
-    () => weights.value.at(-1)?.payload as { kg: number; measuredAt: string } | undefined,
+    () =>
+      weights.value.at(-1)?.payload as
+        | { kg: number; measuredAt: string; source: 'manual' | 'withings' }
+        | undefined,
   ),
   conflicts = computed(() => rows.value.filter((r) => r.conflict)),
   filteredCatalog = computed(() =>
@@ -105,7 +127,9 @@ const week = computed(() =>
         1,
         Math.min(
           (cycle.value.payload as any).weeks,
-          Math.floor((Date.now() - new Date((cycle.value.payload as any).start).getTime()) / 604800000) + 1,
+          Math.floor(
+            (Date.now() - new Date((cycle.value.payload as any).start).getTime()) / 604800000,
+          ) + 1,
         ),
       )
     : 1,
@@ -121,7 +145,9 @@ const weekly = computed(() =>
 )
 const activity = computed(() =>
   Array.from({ length: 7 }, (_, i) =>
-    weekly.value.some((r) => (new Date((r.payload as TrainingSession).completedAt!).getDay() + 6) % 7 === i),
+    weekly.value.some(
+      (r) => (new Date((r.payload as TrainingSession).completedAt!).getDay() + 6) % 7 === i,
+    ),
   ),
 )
 const graph = computed(() => {
@@ -130,7 +156,10 @@ const graph = computed(() => {
   const min = Math.min(...values) - 0.2,
     range = Math.max(...values) - min + 0.2
   return values
-    .map((n, i) => `${i ? 'L' : 'M'}${(i / (values.length - 1)) * 280},${68 - ((n - min) / range) * 60}`)
+    .map(
+      (n, i) =>
+        `${i ? 'L' : 'M'}${(i / (values.length - 1)) * 280},${68 - ((n - min) / range) * 60}`,
+    )
     .join(' ')
 })
 let unsubscribe: (() => void) | undefined,
@@ -399,7 +428,10 @@ async function mediaRequest(endpoint: string, body: unknown) {
   if (!data.session) throw new Error('Accedi di nuovo')
   const response = await fetch('/api/media/' + endpoint, {
     method: 'POST',
-    headers: { Authorization: 'Bearer ' + data.session.access_token, 'Content-Type': 'application/json' },
+    headers: {
+      Authorization: 'Bearer ' + data.session.access_token,
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(75000),
   })
@@ -414,7 +446,10 @@ async function uploadVideo(row: LocalRecord, event: Event) {
     notify('Collega un account e torna online per caricare video.')
     return
   }
-  if (file.size > 25 * 1024 * 1024 || !['video/mp4', 'video/webm', 'video/quicktime'].includes(file.type)) {
+  if (
+    file.size > 25 * 1024 * 1024 ||
+    !['video/mp4', 'video/webm', 'video/quicktime'].includes(file.type)
+  ) {
     notify('Scegli un video MP4, WebM o MOV fino a 25 MB.')
     return
   }
@@ -508,7 +543,9 @@ const date = (value: string) =>
         <span class="demo-dot" />{{
           local ? 'Solo dispositivo' : online ? 'Il tuo spazio personale' : 'Sei offline'
         }}
-        <p>{{ local ? 'Dati locali, senza sincronizzazione' : pending + ' modifiche in attesa' }}</p>
+        <p>
+          {{ local ? 'Dati locali, senza sincronizzazione' : pending + ' modifiche in attesa' }}
+        </p>
         <button class="profile profile-button" @click="view = 'account'">
           <span class="avatar">{{ displayName[0] }}</span
           ><span>{{ displayName }}<small>Il tuo ritmo. Il tuo percorso.</small></span>
@@ -577,7 +614,8 @@ const date = (value: string) =>
                 <p>Crea il tuo mesociclo o parti da una scheda modificabile.</p>
                 <div class="button-group">
                   <button class="primary" :disabled="busy" @click="seed">
-                    {{ busy ? 'Creazione…' : 'Usa percorso iniziale' }} <GIcon name="arrow" /></button
+                    {{ busy ? 'Creazione…' : 'Usa percorso iniziale' }}
+                    <GIcon name="arrow" /></button
                   ><button class="secondary" @click="openEditor('cycle')">Crea da zero +</button>
                 </div>
                 <div class="orb" aria-hidden="true"><i v-for="i in 6" :key="i" /></div>
@@ -587,7 +625,10 @@ const date = (value: string) =>
                   <label
                     >Mesociclo<select
                       v-model="cycleId"
-                      @change="planId = ''; workoutId = ''"
+                      @change="
+                        planId = '';
+                        workoutId = ''
+                      "
                     >
                       <option v-for="c in cycles" :key="c.id" :value="c.id">
                         {{ (c.payload as any).name }}
@@ -621,18 +662,25 @@ const date = (value: string) =>
                       </div>
                       <button v-if="view === 'oggi'" class="text-btn" @click="view = 'percorso'">
                         Esplora il percorso ↗</button
-                      ><span v-else class="subtle">Dal {{ date((cycle!.payload as any).start) }}</span>
+                      ><span v-else class="subtle"
+                        >Dal {{ date((cycle!.payload as any).start) }}</span
+                      >
                     </div>
                   </section>
                   <section class="panel weight-panel">
                     <div class="panel-title">
                       <h2>Il tuo peso</h2>
-                      <button class="icon-btn" aria-label="Registra peso" @click="openEditor('weight')">
+                      <button
+                        class="icon-btn"
+                        aria-label="Registra peso"
+                        @click="openEditor('weight')"
+                      >
                         +
                       </button>
                     </div>
                     <div class="weight">
-                      {{ latestWeight ? latestWeight.kg.toLocaleString('it-IT') : '—' }}<small>kg</small>
+                      {{ latestWeight ? latestWeight.kg.toLocaleString('it-IT') : '—'
+                      }}<small>kg</small>
                     </div>
                     <div class="subtle">Un dato. Non il tuo valore.</div>
                     <svg
@@ -653,7 +701,10 @@ const date = (value: string) =>
                     </div>
                     <div class="weight-bottom">
                       <span>Registrazione manuale</span
-                      ><span>{{ latestWeight ? date(latestWeight.measuredAt) : 'Nessun dato' }}</span>
+                      ><span
+                        >{{ latestWeight ? date(latestWeight.measuredAt) : 'Nessun dato'
+                        }}{{ latestWeight?.source === 'withings' ? ' / Withings' : '' }}</span
+                      >
                     </div>
                   </section>
                   <section class="panel workout">
@@ -670,7 +721,10 @@ const date = (value: string) =>
                       <label
                         >Scheda<select
                           :value="plan?.id"
-                          @change="planId = ($event.target as HTMLSelectElement).value; workoutId = ''"
+                          @change="
+                            planId = ($event.target as HTMLSelectElement).value;
+                            workoutId = ''
+                          "
                         >
                           <option v-for="p in plans" :key="p.id" :value="p.id">
                             {{ (p.payload as any).name }}
@@ -700,18 +754,27 @@ const date = (value: string) =>
                         :aria-pressed="w.id === workout?.id"
                         @click="workoutId = w.id"
                       >
-                        <strong>{{ String.fromCharCode(65 + i) }} · {{ (w.payload as Workout).name }}</strong
+                        <strong
+                          >{{ String.fromCharCode(65 + i) }} ·
+                          {{ (w.payload as Workout).name }}</strong
                         >{{ (w.payload as Workout).exercises.length }} esercizi
                       </button>
                     </div>
                     <div v-if="workoutData">
                       <div v-for="e in workoutData.exercises" :key="e.id" class="exercise-row">
                         <div class="exercise-symbol">
-                          <GIcon :name="e.mode === 'band' ? 'leaf' : 'barbell'" />
+                          <GIcon :name="e.assistance?.length ? 'leaf' : 'barbell'" />
                         </div>
                         <div class="exercise-info">
                           <strong>{{ e.name }}</strong
-                          ><small>{{ modeNames[e.mode] }}{{ e.band ? ' · ' + e.band : '' }}</small
+                          ><small
+                            >{{ e.exerciseType === 'weights' ? 'Pesi' : 'Corpo libero'
+                            }}{{ e.variant ? ' / ' + e.variant.name : ''
+                            }}{{
+                              e.assistance?.length
+                                ? ' / ' + e.assistance.map((b) => b.name).join(' + ')
+                                : ''
+                            }}{{ e.band ? ' / ' + e.band : '' }}</small
                           ><small v-if="e.notes">{{ e.notes }}</small>
                         </div>
                         <span
@@ -727,9 +790,13 @@ const date = (value: string) =>
                       <div class="workout-action">
                         <span class="subtle"
                           >{{ workoutData.exercises.length }} esercizi ·
-                          {{ workoutData.exercises.reduce((n, e) => n + e.sets.length, 0) }} serie</span
+                          {{
+                            workoutData.exercises.reduce((n, e) => n + e.sets.length, 0)
+                          }}
+                          serie</span
                         ><button class="primary" @click="start">
-                          {{ ongoing ? 'Riprendi sessione' : 'Entra in allenamento' }} <GIcon name="arrow" />
+                          {{ ongoing ? 'Riprendi sessione' : 'Entra in allenamento' }}
+                          <GIcon name="arrow" />
                         </button>
                       </div>
                     </div>
@@ -741,9 +808,17 @@ const date = (value: string) =>
                         @click="openEditor('workout', undefined, plan!.id)"
                       >
                         Nuova giornata +</button
-                      ><button v-if="workout" class="text-btn" @click="openEditor('workout', workout)">
+                      ><button
+                        v-if="workout"
+                        class="text-btn"
+                        @click="openEditor('workout', workout)"
+                      >
                         Modifica giornata</button
-                      ><button v-if="workout" class="text-btn danger" @click="deleteRecord = workout!">
+                      ><button
+                        v-if="workout"
+                        class="text-btn danger"
+                        @click="deleteRecord = workout!"
+                      >
                         Elimina giornata</button
                       ><button
                         v-if="plan && !workouts.length"
@@ -764,7 +839,10 @@ const date = (value: string) =>
                       <div class="week-bars">
                         <div v-for="(d, i) in ['L', 'M', 'M', 'G', 'V', 'S', 'D']" :key="i">
                           <b
-                            :class="{ filled: activity[i], today: (new Date().getDay() + 6) % 7 === i }"
+                            :class="{
+                              filled: activity[i],
+                              today: (new Date().getDay() + 6) % 7 === i,
+                            }"
                             :style="{ animationDelay: i * 60 + 'ms' }"
                           />{{ d }}
                         </div>
@@ -812,8 +890,13 @@ const date = (value: string) =>
                       ✎
                     </button>
                   </div>
-                  <span class="eyebrow">{{ modeNames[(e.payload as Exercise).mode] }}</span>
+                  <span class="eyebrow">{{
+                    (e.payload as Exercise).exerciseType === 'weights' ? 'Pesi' : 'Corpo libero'
+                  }}</span>
                   <h2>{{ (e.payload as Exercise).name }}</h2>
+                  <p v-if="(e.payload as Exercise).variants?.length" class="subtle">
+                    {{ (e.payload as Exercise).variants.map((v) => v.name).join(' / ') }}
+                  </p>
                   <p class="subtle">{{ (e.payload as Exercise).description }}</p>
                   <p class="subtle">{{ (e.payload as Exercise).notes }}</p>
                   <div class="card-tools">
@@ -875,7 +958,8 @@ const date = (value: string) =>
                           0,
                         )
                       }}
-                      serie · {{ (s.payload as TrainingSession).bodyWeight ?? '—' }} kg corporei</small
+                      serie · {{ (s.payload as TrainingSession).bodyWeight ?? '—' }} kg
+                      corporei</small
                     ></span
                   ><span class="text-lime">{{
                     (s.payload as TrainingSession).completedAt ? 'Dettagli ↗' : 'Riprendi →'
@@ -896,15 +980,17 @@ const date = (value: string) =>
                 <div>
                   <span class="eyebrow">TUTTO SOTTO CONTROLLO</span>
                   <h1>Il tuo <em>spazio.</em></h1>
-                  <p>{{ authSession?.user.email || 'Modalità locale · dati su questo dispositivo' }}</p>
+                  <p>
+                    {{ authSession?.user.email || 'Modalità locale · dati su questo dispositivo' }}
+                  </p>
                 </div>
               </div>
               <div class="program-grid">
                 <section class="panel">
                   <h2>Salvataggio e sincronizzazione</h2>
                   <p v-if="!local && !authSession" class="notice">
-                    Accesso da rinnovare. Puoi continuare a registrare sul dispositivo e sincronizzare dopo il
-                    login.
+                    Accesso da rinnovare. Puoi continuare a registrare sul dispositivo e
+                    sincronizzare dopo il login.
                   </p>
                   <button v-if="!local && !authSession" class="primary" @click="reauth = true">
                     Rinnova accesso ?
@@ -915,8 +1001,8 @@ const date = (value: string) =>
                     {{ conflicts.length }} conflitti
                   </p>
                   <p class="notice">
-                    Gli allenamenti vengono salvati prima sul dispositivo. Con un account, si sincronizzano
-                    all’apertura, ogni 30 secondi e al ritorno della connessione.
+                    Gli allenamenti vengono salvati prima sul dispositivo. Con un account, si
+                    sincronizzano all’apertura, ogni 30 secondi e al ritorno della connessione.
                   </p>
                   <div class="button-group">
                     <button v-if="!local" class="primary" @click="sync">
@@ -932,7 +1018,8 @@ const date = (value: string) =>
                     {{ (c.payload as any).name || 'Pesata' }} · risolvi →
                   </button>
                   <p class="notice">
-                    Il backup JSON include schede, sessioni e dati locali. Conservalo in un luogo personale.
+                    Il backup JSON include schede, sessioni e dati locali. Conservalo in un luogo
+                    personale.
                   </p>
                   <button class="text-btn" @click="logoutOpen = true">
                     {{ local ? 'Torna all’accesso' : 'Esci da questo dispositivo' }} →
@@ -941,29 +1028,48 @@ const date = (value: string) =>
                 <section class="panel">
                   <h2>Gymbrain sempre con te</h2>
                   <p class="subtle">
-                    Su iPhone: apri questa app in Safari, tocca Condividi → Aggiungi alla schermata Home.
+                    Su iPhone: apri questa app in Safari, tocca Condividi → Aggiungi alla schermata
+                    Home.
                   </p>
                   <p class="subtle">
                     Su Chrome: usa “Installa app” dal menu del browser, quando disponibile.
                   </p>
                   <p class="notice">
-                    Apri l’app online almeno una volta prima di allenarti senza connessione. I video allegati
-                    richiedono la rete.
-                  </p>
-                  <h3>Il peso, al tuo ritmo</h3>
-                  <p class="subtle">
-                    L’inserimento manuale è attivo. Il collegamento Withings richiede la registrazione
-                    dell’integrazione: non è ancora connesso.
+                    Apri l’app online almeno una volta prima di allenarti senza connessione. I video
+                    allegati richiedono la rete.
                   </p>
                   <button class="secondary" @click="openEditor('weight')">Registra peso +</button>
                 </section>
-              </div></template
-            >
-          </div></Transition
-        >
+                <WithingsPanel
+                  :info="withings.info.value"
+                  :loading="withings.loading.value"
+                  :message="withings.message.value"
+                  :checked="withings.checked.value"
+                  :online="online"
+                  :local="local"
+                  @connect="withings.connect"
+                  @sync="withings.syncWeights(false)"
+                  @disconnect="withings.disconnectOpen.value = true"
+                /></div
+            ></template></div
+        ></Transition>
       </div>
       <footer>MADE FOR YOUR NEXT LEVEL <span>GYMBRAIN · IL TUO RITMO</span></footer>
     </main>
+    <AppModal
+      :open="withings.disconnectOpen.value"
+      title="Scollega Withings"
+      @close="withings.disconnectOpen.value = false"
+    >
+      <p>
+        Interrompi l'importazione e revochi l'accesso a Withings. Le pesate importate restano nel
+        diario.
+      </p>
+      <button class="primary" :disabled="withings.loading.value" @click="withings.disconnect">
+        Conferma scollegamento
+      </button>
+      <p v-if="withings.message.value" role="status">{{ withings.message.value }}</p>
+    </AppModal>
     <RecordEditor
       :open="editor.open"
       :kind="editor.kind"
@@ -985,8 +1091,8 @@ const date = (value: string) =>
     <AppModal :open="!!deleteRecord" title="ELIMINA ELEMENTO" @close="deleteRecord = null"
       ><h2>Eliminare {{ (deleteRecord?.payload as any)?.name || 'questo elemento' }}?</h2>
       <p class="notice">
-        Le sessioni già registrate conservano esercizi e prescrizioni originali. Mesocicli e schede devono
-        essere svuotati prima di eliminarli.
+        Le sessioni già registrate conservano esercizi e prescrizioni originali. Mesocicli e schede
+        devono essere svuotati prima di eliminarli.
       </p>
       <button class="primary" @click="destroy">Conferma eliminazione</button></AppModal
     >
@@ -1006,7 +1112,11 @@ const date = (value: string) =>
         {{ local ? 'Torna all’accesso' : 'Esci e rimuovi cache' }}
       </button></AppModal
     >
-    <AppModal :open="!!historyRecord" title="OGNI SERIE HA UNA STORIA" wide @close="historyRecord = null"
+    <AppModal
+      :open="!!historyRecord"
+      title="OGNI SERIE HA UNA STORIA"
+      wide
+      @close="historyRecord = null"
       ><template v-if="historyRecord"
         ><h2>{{ (historyRecord.payload as TrainingSession).name }}</h2>
         <p class="subtle">
@@ -1022,7 +1132,13 @@ const date = (value: string) =>
           <p v-if="e.exerciseId !== e.originalExerciseId" class="badge">
             {{ e.originalName }} → {{ e.name }} · {{ e.substitutionReason }}
           </p>
-          <p class="subtle">{{ modeNames[e.mode] }} · {{ e.band }} · {{ e.notes }}</p>
+          <p class="subtle">
+            {{ e.exerciseType === 'weights' ? 'Pesi' : 'Corpo libero' }} /
+            {{ e.variant?.name || 'Standard' }} / {{ e.band }} / {{ e.notes }}
+          </p>
+          <p v-for="band in e.assistance" :key="band.id" class="notice">
+            {{ band.name }}: {{ band.minKg }}–{{ band.maxKg }} kg nominali
+          </p>
           <div v-for="(s, i) in e.actual" :key="i" class="history-set">
             <span>{{ i + 1 }}. {{ s.done ? '✓' : 'Non eseguita' }}</span
             ><span>{{ s.reps ?? '—' }} rep</span><span>{{ s.load ?? '—' }} kg</span
@@ -1037,11 +1153,15 @@ const date = (value: string) =>
     <AppModal :open="!!videoUrl" title="IL MOVIMENTO, DA VICINO" wide @close="videoUrl = ''"
       ><video v-if="videoUrl" :src="videoUrl" controls playsinline class="video-player"
     /></AppModal>
-    <AppModal :open="!!conflictRecord" title="DUE MODIFICHE, UNA SCELTA" wide @close="conflictRecord = null"
+    <AppModal
+      :open="!!conflictRecord"
+      title="DUE MODIFICHE, UNA SCELTA"
+      wide
+      @close="conflictRecord = null"
       ><h2>Quale versione vuoi conservare?</h2>
       <p class="notice">
-        Un altro dispositivo ha modificato lo stesso elemento. Puoi esportare un backup prima di scegliere.
-        Non uniamo i dati automaticamente.
+        Un altro dispositivo ha modificato lo stesso elemento. Puoi esportare un backup prima di
+        scegliere. Non uniamo i dati automaticamente.
       </p>
       <div class="form-grid">
         <div>
@@ -1050,7 +1170,9 @@ const date = (value: string) =>
         </div>
         <div>
           <h3>Versione online</h3>
-          <pre class="conflict-data">{{ JSON.stringify(conflictRecord?.conflict?.payload, null, 2) }}</pre>
+          <pre class="conflict-data">{{
+            JSON.stringify(conflictRecord?.conflict?.payload, null, 2)
+          }}</pre>
         </div>
       </div>
       <div class="button-group">
@@ -1059,10 +1181,13 @@ const date = (value: string) =>
         ><button class="text-btn" @click="exportData">Esporta backup</button>
       </div></AppModal
     >
-    <div v-if="$pwa?.needRefresh" class="update-banner">
-      Nuova versione pronta.<button class="text-btn" @click="$pwa.updateServiceWorker()">Aggiorna app</button>
+    <div v-if="updates.available.value" class="update-banner" role="status">
+      Nuova versione pronta. Si aggiornerà automaticamente quando avrai chiuso i moduli e
+      l’allenamento.
     </div></template
   ><Transition name="toast"
-    ><div v-if="toast" id="toast" popover="manual" class="show" role="status">{{ toast }}</div></Transition
+    ><div v-if="toast" id="toast" popover="manual" class="show" role="status">
+      {{ toast }}
+    </div></Transition
   >
 </template>

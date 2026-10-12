@@ -171,3 +171,15 @@ I precedenti tentativi di salvare `gymbrain-product-spec.md` erano falliti per i
 - https://support.apple.com/guide/iphone/open-as-web-app-iphea86e5236/ios
 
 Le condizioni dei fornitori possono cambiare: verificarle al momento dell'attivazione.
+
+
+## Aggiornamento: Withings e varianti
+
+- Integrazione diretta Withings per le pesate; WHOOP resta separato e non necessario per il peso.
+- Una sola applicazione OAuth Gymbrain, consenso individuale degli utenti, credenziali solo backend, token cifrati nel database condiviso. Pesi importati con provenienza e timestamp, ultimo valore suggerito nelle nuove sessioni senza modificare lo storico.
+
+- Modello definitivo del repertorio: tipologia corpo libero/pesi; varianti del movimento (es. HSPU / Deep), con nome e note create dall'utente.
+- Nella scheda: esercizio, variante, kg di sovraccarico per corpo libero o carico per pesi, bande di assistenza selezionabili. Preset GORNATION UL 2-7, Light 5-15, Medium 10-30, Heavy 20-40 kg nominali; nessuna sottrazione fissa dal peso corporeo.
+- Migrazione 004 con backup dei record esercizio, ID conservati, storico sessioni invariato; migrazione IndexedDB v2 compatibile con outbox immutabile.
+
+- Aggiornamento PWA automatico all'apertura/ritorno online/in primo piano e con controllo ogni 60 secondi; ricaricamento differito durante allenamenti e moduli aperti, anche tra piu schede. Cache dati e coda offline preservate. Nessun requisito di aggiornamento in background su iOS.

@@ -29,6 +29,37 @@ export function createRecordsModule(module: Module, auth = authenticate) {
     const m = parsed.data
     if (moduleFor(m.kind) !== module)
       return reply.code(400).send({ error: 'Tipo non appartenente al modulo' })
+    if (m.kind === 'weight') {
+      const { data: previous, error: readError } = await db
+        .from('tracking_records')
+        .select('payload')
+        .eq('user_id', userId)
+        .eq('id', m.id)
+        .maybeSingle()
+      if (readError) throw readError
+      const payload = m.payload as any
+      if (previous?.payload?.source === 'withings') {
+        if (!m.deleted || JSON.stringify(previous.payload) !== JSON.stringify(payload)) {
+          // Compare fields independent of PostgreSQL JSON key ordering.
+          if (
+            !m.deleted ||
+            ['kg', 'measuredAt', 'source', 'externalId'].some(
+              (k) => previous.payload[k] !== payload[k],
+            )
+          )
+            return reply
+              .code(400)
+              .send({
+                error:
+                  'Le pesate Withings vengono aggiornate dalla bilancia. Puoi eliminarle o aggiungere una pesata manuale.',
+              })
+        }
+      } else if (payload.source !== 'manual' || payload.externalId) {
+        return reply
+          .code(400)
+          .send({ error: 'La provenienza Withings è riservata all’importazione.' })
+      }
+    }
     const { data, error } = await db.rpc(`${module}_server_apply`, {
       owner_id: userId,
       operation_id: m.operationId,

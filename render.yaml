@@ -18,3 +18,5 @@ services:
         sync: false
       - key: SUPABASE_SECRET_KEY
         sync: false
+      - key: APP_ORIGIN
+        value: https://gymbrain-llkm.onrender.com

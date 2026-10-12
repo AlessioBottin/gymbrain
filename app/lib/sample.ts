@@ -3,10 +3,11 @@ import { newTarget, type Exercise, type Prescription, type LocalRecord } from '.
 export async function createStarter(owner: string) {
   const exercises: Exercise[] = [
     {
-      name: 'Pull-up zavorrato',
-      description: 'Trazione alla sbarra con zavorra.',
+      name: 'Pull-up',
+      description: 'Trazione alla sbarra.',
       notes: 'Scapole attive.',
-      mode: 'weighted',
+      exerciseType: 'bodyweight',
+      variants: [],
       videoUrl: '',
       videoPath: '',
     },
@@ -14,7 +15,8 @@ export async function createStarter(owner: string) {
       name: 'Dip alle parallele',
       description: 'Spinta alle parallele.',
       notes: 'Mantieni il controllo.',
-      mode: 'bodyweight',
+      exerciseType: 'bodyweight',
+      variants: [],
       videoUrl: '',
       videoPath: '',
     },
@@ -22,7 +24,8 @@ export async function createStarter(owner: string) {
       name: 'Rematore agli anelli',
       description: 'Trazione orizzontale.',
       notes: 'Corpo in linea.',
-      mode: 'bodyweight',
+      exerciseType: 'bodyweight',
+      variants: [],
       videoUrl: '',
       videoPath: '',
     },
@@ -30,15 +33,8 @@ export async function createStarter(owner: string) {
       name: 'Squat',
       description: 'Accosciata con bilanciere.',
       notes: 'Movimento controllato.',
-      mode: 'external',
-      videoUrl: '',
-      videoPath: '',
-    },
-    {
-      name: 'Pull-up con elastico',
-      description: 'Trazione assistita.',
-      notes: 'Regola la banda in base alle necessità.',
-      mode: 'band',
+      exerciseType: 'weights',
+      variants: [],
       videoUrl: '',
       videoPath: '',
     },
@@ -60,21 +56,26 @@ export async function createStarter(owner: string) {
   for (const [i, ids] of [
     [0, 1, 2],
     [3, 2],
-    [4, 1, 3],
+    [0, 1, 3],
   ].entries()) {
     const prescriptions: Prescription[] = ids.map((id) => ({
       id: crypto.randomUUID(),
       exerciseId: rows[id]!.id,
       name: exercises[id]!.name,
-      mode: exercises[id]!.mode,
+      mode: id === 0 ? (i === 2 ? 'band' : 'weighted') : id === 3 ? 'external' : 'bodyweight',
+      exerciseType: exercises[id]!.exerciseType,
+      variant: null,
+      assistance: [],
       notes:
-        i === 0 ? 'Salita esplosiva, discesa controllata.' : 'Mantieni il controllo durante il movimento.',
-      band: id === 4 ? 'Assistenza media' : '',
-      alternatives: id === 0 ? [rows[4]!.id] : [],
+        i === 0
+          ? 'Salita esplosiva, discesa controllata.'
+          : 'Mantieni il controllo durante il movimento.',
+      band: id === 0 && i === 2 ? 'Assistenza media' : '',
+      alternatives: id === 0 ? [rows[2]!.id] : [],
       sets: Array.from({ length: 3 }, () => ({
         ...newTarget(),
         reps: id === 0 ? 6 : 8,
-        load: id === 0 ? 10 : id === 3 ? 60 : null,
+        load: id === 0 && i === 0 ? 10 : id === 3 ? 60 : null,
       })),
     }))
     await saveRecord(
