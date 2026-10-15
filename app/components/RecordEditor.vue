@@ -7,35 +7,58 @@ import {
   type Prescription,
   type Exercise,
   type Kind,
-} from '../../shared/domain'
+} from '../../shared/domain';
 const props = defineProps<{
-  open: boolean
-  kind: Kind
-  record?: LocalRecord
-  parentId?: string
-  catalog: LocalRecord[]
-}>()
+  owner: string;
+  open: boolean;
+  kind: Kind;
+  record?: LocalRecord;
+  parentId?: string;
+  catalog: LocalRecord[];
+}>();
 const emit = defineEmits<{
-  close: []
-  save: [kind: Kind, payload: any, id?: string, parentId?: string | null, revision?: number]
-}>()
+  close: [];
+  save: [kind: Kind, payload: any, id?: string, parentId?: string | null, revision?: number];
+}>();
 const draft = ref<any>({}),
   error = ref(''),
-  selectedExercise = ref('')
-const prescriptions = computed(() => draft.value.exercises as Prescription[])
-const fields = ['reps', 'load', 'rpe', 'rir', 'tut'] as const
+  selectedExercise = ref('');
+const prescriptions = computed(() => draft.value.exercises as Prescription[]);
+const draftKey = computed(
+  () => `gymbrain-draft:${props.owner}:${props.kind}:${props.record?.id || props.parentId || 'new'}`,
+);
+const draftNotice = ref('');
+const baseRevision = ref<number>();
+let initialDraft: any = {};
+watch(
+  draft,
+  () => {
+    if (!props.open || !props.owner) return;
+    try {
+      localStorage.setItem(
+        draftKey.value,
+        JSON.stringify({ payload: draft.value, revision: baseRevision.value }),
+      );
+      draftNotice.value = 'Bozza conservata su questo dispositivo.';
+    } catch {
+      draftNotice.value = 'Spazio locale non disponibile: salva prima di chiudere.';
+    }
+  },
+  { deep: true },
+);
+const fields = ['reps', 'load', 'rpe', 'rir', 'tut'] as const;
 const modes = [
   ['bodyweight', 'Corpo libero'],
   ['weighted', 'Zavorra'],
   ['external', 'Carico esterno'],
   ['band', 'Banda elastica'],
-]
+];
 watch(
   () => props.open,
   (value) => {
-    if (!value) return
-    error.value = ''
-    selectedExercise.value = ''
+    if (!value) return;
+    error.value = '';
+    selectedExercise.value = '';
     draft.value = props.record
       ? JSON.parse(
           JSON.stringify(
@@ -52,6 +75,7 @@ watch(
             description: '',
             notes: '',
             exerciseType: 'bodyweight',
+            measurement: 'reps',
             variants: [],
             videoUrl: '',
             videoPath: '',
@@ -62,13 +86,25 @@ watch(
             ? { name: '', notes: '', order: 0 }
             : props.kind === 'weight'
               ? { kg: 75, measuredAt: new Date().toISOString(), source: 'manual' }
-              : { name: '', notes: '', order: 0, exercises: [] }
+              : { name: '', notes: '', order: 0, exercises: [] };
+    initialDraft = JSON.parse(JSON.stringify(draft.value));
+    baseRevision.value = props.record?.localRevision;
+    try {
+      const saved = JSON.parse(localStorage.getItem(draftKey.value) || 'null');
+      if (saved?.payload) {
+        draft.value = saved.payload;
+        baseRevision.value = saved.revision;
+        draftNotice.value = 'Bozza recuperata: puoi continuare da dove eri rimasto.';
+      }
+    } catch {
+      draftNotice.value = 'Bozza non leggibile: il record salvato è disponibile.';
+    }
   },
-)
+);
 function addExercise() {
-  const row = props.catalog.find((r) => r.id === selectedExercise.value)
-  if (!row) return
-  const e = row.payload as Exercise
+  const row = props.catalog.find((r) => r.id === selectedExercise.value);
+  if (!row) return;
+  const e = row.payload as Exercise;
   draft.value.exercises.push({
     id: crypto.randomUUID(),
     exerciseId: row.id,
@@ -76,48 +112,49 @@ function addExercise() {
     notes: '',
     mode: e.exerciseType === 'weights' ? 'external' : 'bodyweight',
     exerciseType: e.exerciseType,
+    measurement: e.measurement || 'reps',
     variant: null,
     assistance: [],
     band: '',
     alternatives: [],
-    sets: [newTarget(), newTarget(), newTarget()],
-  } satisfies Prescription)
-  selectedExercise.value = ''
+    sets: [newTarget(e.measurement), newTarget(e.measurement), newTarget(e.measurement)],
+  } satisfies Prescription);
+  selectedExercise.value = '';
 }
 function addVariant() {
-  draft.value.variants.push({ id: crypto.randomUUID(), name: '', notes: '' })
+  draft.value.variants.push({ id: crypto.randomUUID(), name: '', notes: '' });
 }
 function variantsFor(id: string) {
-  return (props.catalog.find((r) => r.id === id)?.payload as Exercise | undefined)?.variants || []
+  return (props.catalog.find((r) => r.id === id)?.payload as Exercise | undefined)?.variants || [];
 }
 function chooseVariant(e: Prescription, id: string) {
-  const variant = variantsFor(e.exerciseId).find((v) => v.id === id)
-  e.variant = variant ? { ...variant } : null
+  const variant = variantsFor(e.exerciseId).find((v) => v.id === id);
+  e.variant = variant ? { ...variant } : null;
 }
 function setLoad(e: Prescription, event: Event) {
-  const value = (event.target as HTMLInputElement).value
-  for (const set of e.sets) set.load = value === '' ? null : Number(value)
+  const value = (event.target as HTMLInputElement).value;
+  for (const set of e.sets) set.load = value === '' ? null : Number(value);
 }
 function move(index: number, dir: number) {
   const list = draft.value.exercises,
-    other = index + dir
-  if (other < 0 || other >= list.length) return
-  ;[list[index], list[other]] = [list[other], list[index]]
+    other = index + dir;
+  if (other < 0 || other >= list.length) return;
+  [list[index], list[other]] = [list[other], list[index]];
 }
 function submit() {
-  if (props.kind === 'exercise') delete draft.value.mode
+  if (props.kind === 'exercise') delete draft.value.mode;
   emit(
     'save',
     props.kind,
     JSON.parse(JSON.stringify(draft.value)),
     props.record?.id,
     props.record?.parent_id ?? props.parentId ?? null,
-    props.record?.localRevision,
-  )
+    baseRevision.value,
+  );
 }
 function clean(set: any, key: string, event: Event) {
-  const value = (event.target as HTMLInputElement).value
-  set[key] = value === '' ? null : Number(value)
+  const value = (event.target as HTMLInputElement).value;
+  set[key] = value === '' ? null : Number(value);
 }
 </script>
 <template>
@@ -127,6 +164,17 @@ function clean(set: any, key: string, event: Event) {
     :wide="kind === 'workout'"
     @close="emit('close')"
     ><form v-if="open" @submit.prevent="submit">
+      <p class="draft-status" role="status">{{ draftNotice }}</p>
+      <button
+        type="button"
+        class="text-btn"
+        @click="
+          draft = JSON.parse(JSON.stringify(initialDraft));
+          baseRevision = record?.localRevision;
+        "
+      >
+        Riparti dai dati salvati
+      </button>
       <h2>
         {{
           (
@@ -156,19 +204,25 @@ function clean(set: any, key: string, event: Event) {
       ><template v-else
         ><label>Nome<input v-model="draft.name" required maxlength="100" autofocus /></label
         ><template v-if="kind === 'exercise'"
-          ><label
-            >Descrizione<textarea v-model="draft.description" rows="2" maxlength="4000" /></label
+          ><label>Descrizione<textarea v-model="draft.description" rows="2" maxlength="4000" /></label
           ><label
             >Tipologia esercizio<select v-model="draft.exerciseType">
               <option value="bodyweight">Corpo libero</option>
               <option value="weights">Pesi</option>
             </select></label
           >
+          <label
+            >Modalità di esecuzione<select
+              :value="draft.measurement || 'reps'"
+              @change="draft.measurement = ($event.target as HTMLSelectElement).value"
+            >
+              <option value="reps">A ripetizioni</option>
+              <option value="duration">Isometria - secondi</option>
+            </select></label
+          >
           <fieldset class="assistance-picker">
             <legend>Varianti del movimento</legend>
-            <p class="notice">
-              Per esempio HSPU con variante Deep. Il sovraccarico si imposta nella scheda.
-            </p>
+            <p class="notice">Per esempio HSPU con variante Deep. Il sovraccarico si imposta nella scheda.</p>
             <div v-for="(variant, i) in draft.variants" :key="variant.id" class="variant-editor">
               <label
                 >Nome variante<input
@@ -177,9 +231,7 @@ function clean(set: any, key: string, event: Event) {
                   maxlength="100"
                   placeholder="Deep / profondo"
               /></label>
-              <label
-                >Note variante<textarea v-model="variant.notes" maxlength="4000" rows="2" />
-              </label>
+              <label>Note variante<textarea v-model="variant.notes" maxlength="4000" rows="2" /></label>
               <button type="button" class="text-btn" @click="draft.variants.splice(i, 1)">
                 Rimuovi variante
               </button>
@@ -203,12 +255,7 @@ function clean(set: any, key: string, event: Event) {
         <div v-if="kind === 'cycle'" class="form-grid">
           <label>Data di inizio<input v-model="draft.start" type="date" required /></label
           ><label
-            >Durata (settimane)<input
-              v-model.number="draft.weeks"
-              type="number"
-              min="1"
-              max="52"
-              required
+            >Durata (settimane)<input v-model.number="draft.weeks" type="number" min="1" max="52" required
           /></label>
         </div>
         <label v-if="kind === 'plan' || kind === 'workout'"
@@ -234,18 +281,11 @@ function clean(set: any, key: string, event: Event) {
                 {{ (e.payload as Exercise).name }}
               </option>
             </select></label
-          ><button
-            type="button"
-            class="secondary"
-            :disabled="!selectedExercise"
-            @click="addExercise"
-          >
+          ><button type="button" class="secondary" :disabled="!selectedExercise" @click="addExercise">
             Aggiungi +
           </button>
         </div>
-        <p v-if="!catalog.length" class="notice">
-          Crea prima i tuoi esercizi nella sezione Esercizi.
-        </p>
+        <p v-if="!catalog.length" class="notice">Crea prima i tuoi esercizi nella sezione Esercizi.</p>
         <TransitionGroup name="list" tag="div"
           ><section v-for="(e, i) in prescriptions" :key="e.id" class="prescription-editor">
             <div class="inline-top">
@@ -277,6 +317,15 @@ function clean(set: any, key: string, event: Event) {
                 </button>
               </div>
             </div>
+            <label
+              >Modalità di esecuzione<select
+                :value="e.measurement || 'reps'"
+                @change="e.measurement = ($event.target as HTMLSelectElement).value as 'reps' | 'duration'"
+              >
+                <option value="reps">A ripetizioni</option>
+                <option value="duration">Isometria - secondi</option>
+              </select></label
+            >
             <label
               >Note specifiche per questa scheda<textarea
                 v-model="e.notes"
@@ -331,30 +380,27 @@ function clean(set: any, key: string, event: Event) {
                 placeholder="Punto di ancoraggio, piede o ginocchio, eventuale altra banda"
             /></label>
             <label
-              >Alternative consigliate<select
-                v-model="e.alternatives"
-                multiple
-                class="alternatives"
-              >
-                <option
-                  v-for="a in catalog.filter((a) => a.id !== e.exerciseId)"
-                  :key="a.id"
-                  :value="a.id"
-                >
+              >Alternative consigliate<select v-model="e.alternatives" multiple class="alternatives">
+                <option v-for="a in catalog.filter((a) => a.id !== e.exerciseId)" :key="a.id" :value="a.id">
                   {{ (a.payload as Exercise).name }}
                 </option>
               </select></label
             >
             <p class="notice">Target per serie · lascia vuoto se non prescritto</p>
-            <div class="target-editor heading">
-              <span>#</span><span>Rep</span
+            <div class="target-editor heading" :class="{ isometric: e.measurement === 'duration' }">
+              <span>#</span><span>{{ e.measurement === 'duration' ? 'Secondi' : 'Rep' }}</span
               ><span>{{ e.exerciseType === 'bodyweight' ? '+ Kg' : 'Kg' }}</span
-              ><span>RPE</span><span>RIR</span><span>TUT s</span><span />
+              ><span>RPE</span><span>RIR</span><span v-if="e.measurement !== 'duration'">TUT s</span><span />
             </div>
-            <div v-for="(s, j) in e.sets" :key="j" class="target-editor">
+            <div
+              v-for="(s, j) in e.sets"
+              :key="j"
+              class="target-editor"
+              :class="{ isometric: e.measurement === 'duration' }"
+            >
               <span>{{ j + 1 }}</span
-              ><input
-                v-for="k in fields"
+              ><StableNumberInput
+                v-for="k in e.measurement === 'duration' ? (['tut', 'load', 'rpe', 'rir'] as const) : fields"
                 :key="k"
                 :aria-label="`${e.name} serie ${j + 1} target ${k}`"
                 :value="s[k]"
@@ -362,7 +408,7 @@ function clean(set: any, key: string, event: Event) {
                 :min="k === 'rpe' ? 1 : 0"
                 :max="['rpe', 'rir'].includes(k) ? 10 : 2000"
                 :step="['rpe', 'load'].includes(k) ? '.5' : 1"
-                @input="clean(s, k, $event)"
+                @commit="s[k] = $event"
               /><button
                 type="button"
                 class="icon-btn"
@@ -377,7 +423,7 @@ function clean(set: any, key: string, event: Event) {
               type="button"
               class="text-btn"
               :disabled="e.sets.length >= 30"
-              @click="e.sets.push(newTarget())"
+              @click="e.sets.push(newTarget(e.measurement))"
             >
               + Aggiungi serie
             </button>

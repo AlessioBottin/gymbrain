@@ -1,8 +1,8 @@
-import { z } from 'zod'
+import { z } from 'zod';
 
-export const uuid = z.string().uuid()
-const text = z.string().max(4000)
-const number = z.number().finite().min(0).max(2000).nullable()
+export const uuid = z.string().uuid();
+const text = z.string().max(4000);
+const number = z.number().finite().min(0).max(2000).nullable();
 export const targetSchema = z
   .object({
     reps: number,
@@ -11,12 +11,12 @@ export const targetSchema = z
     tut: number,
     load: number,
   })
-  .strict()
-export const loadModeSchema = z.enum(['bodyweight', 'weighted', 'external', 'band'])
-export const exerciseTypeSchema = z.enum(['bodyweight', 'weights'])
+  .strict();
+export const loadModeSchema = z.enum(['bodyweight', 'weighted', 'external', 'band']);
+export const exerciseTypeSchema = z.enum(['bodyweight', 'weights']);
 export const variantSchema = z
   .object({ id: uuid, name: z.string().trim().min(1).max(100), notes: text.default('') })
-  .strict()
+  .strict();
 export const bandSchema = z
   .object({
     id: z.string().max(100),
@@ -25,24 +25,24 @@ export const bandSchema = z
     maxKg: z.number().positive().max(500),
   })
   .strict()
-  .refine((b) => b.minKg <= b.maxKg)
+  .refine((b) => b.minKg <= b.maxKg);
 export function normalizeExercise(value: any) {
-  if (!value || typeof value !== 'object') return value
-  const { mode, ...rest } = value
+  if (!value || typeof value !== 'object') return value;
+  const { mode, ...rest } = value;
   return {
     ...rest,
     exerciseType: value.exerciseType || (mode === 'external' ? 'weights' : 'bodyweight'),
     variants: value.variants || [],
-  }
+  };
 }
 export function normalizePrescription(value: any) {
-  if (!value || typeof value !== 'object') return value
+  if (!value || typeof value !== 'object') return value;
   return {
     ...value,
     exerciseType: value.exerciseType || (value.mode === 'external' ? 'weights' : 'bodyweight'),
     variant: value.variant ?? null,
     assistance: value.assistance || [],
-  }
+  };
 }
 export const exerciseSchema = z.preprocess(
   normalizeExercise,
@@ -52,12 +52,13 @@ export const exerciseSchema = z.preprocess(
       description: text,
       notes: text,
       exerciseType: exerciseTypeSchema,
+      measurement: z.enum(['reps', 'duration']).optional(),
       variants: z.array(variantSchema).max(30),
       videoUrl: z.union([z.literal(''), z.string().url().startsWith('https://')]),
       videoPath: z.string().max(300).default(''),
     })
     .strict(),
-)
+);
 const prescriptionFields = z
   .object({
     id: uuid,
@@ -66,14 +67,15 @@ const prescriptionFields = z
     notes: text,
     mode: loadModeSchema,
     exerciseType: exerciseTypeSchema,
+    measurement: z.enum(['reps', 'duration']).optional(),
     variant: variantSchema.nullable(),
     assistance: z.array(bandSchema).max(8),
     band: z.string().max(200),
     alternatives: z.array(uuid).max(20),
     sets: z.array(targetSchema).min(1).max(30),
   })
-  .strict()
-export const prescriptionSchema = z.preprocess(normalizePrescription, prescriptionFields)
+  .strict();
+export const prescriptionSchema = z.preprocess(normalizePrescription, prescriptionFields);
 export const cycleSchema = z
   .object({
     name: z.string().trim().min(1).max(100),
@@ -81,14 +83,14 @@ export const cycleSchema = z
     start: z.string().date(),
     weeks: z.number().int().min(1).max(52),
   })
-  .strict()
+  .strict();
 export const planSchema = z
   .object({
     name: z.string().trim().min(1).max(100),
     notes: text,
     order: z.number().int().min(0).max(1000),
   })
-  .strict()
+  .strict();
 export const workoutSchema = z
   .object({
     name: z.string().trim().min(1).max(100),
@@ -96,8 +98,8 @@ export const workoutSchema = z
     order: z.number().int().min(0).max(1000),
     exercises: z.array(prescriptionSchema).max(50),
   })
-  .strict()
-export const actualSetSchema = targetSchema.extend({ done: z.boolean() })
+  .strict();
+export const actualSetSchema = targetSchema.extend({ done: z.boolean() });
 export const sessionExerciseSchema = z.preprocess(
   normalizePrescription,
   prescriptionFields.extend({
@@ -110,7 +112,7 @@ export const sessionExerciseSchema = z.preprocess(
     sessionNotes: text,
     substitutionReason: text,
   }),
-)
+);
 export const sessionSchema = z
   .object({
     name: z.string().min(1).max(100),
@@ -122,7 +124,7 @@ export const sessionSchema = z
     notes: text,
     exercises: z.array(sessionExerciseSchema).min(1).max(50),
   })
-  .strict()
+  .strict();
 export const weightSchema = z
   .object({
     kg: z.number().positive().max(500),
@@ -130,7 +132,7 @@ export const weightSchema = z
     source: z.enum(['manual', 'withings']),
     externalId: z.string().max(200).optional(),
   })
-  .strict()
+  .strict();
 export const schemas = {
   exercise: exerciseSchema,
   cycle: cycleSchema,
@@ -138,40 +140,40 @@ export const schemas = {
   workout: workoutSchema,
   session: sessionSchema,
   weight: weightSchema,
-}
-export type Kind = keyof typeof schemas
-export type Module = 'training' | 'tracking'
-export type Exercise = z.infer<typeof exerciseSchema>
-export type Prescription = z.infer<typeof prescriptionSchema>
-export type Workout = z.infer<typeof workoutSchema>
-export type TrainingSession = z.infer<typeof sessionSchema>
-export type Target = z.infer<typeof targetSchema>
+};
+export type Kind = keyof typeof schemas;
+export type Module = 'training' | 'tracking';
+export type Exercise = z.infer<typeof exerciseSchema>;
+export type Prescription = z.infer<typeof prescriptionSchema>;
+export type Workout = z.infer<typeof workoutSchema>;
+export type TrainingSession = z.infer<typeof sessionSchema>;
+export type Target = z.infer<typeof targetSchema>;
 export type Payload =
   | Exercise
   | z.infer<typeof cycleSchema>
   | z.infer<typeof planSchema>
   | Workout
   | TrainingSession
-  | z.infer<typeof weightSchema>
+  | z.infer<typeof weightSchema>;
 export interface RecordRow {
-  id: string
-  user_id: string
-  kind: Kind
-  parent_id: string | null
-  payload: Payload
-  version: number
-  revision: number
-  deleted: boolean
-  updated_at: string
+  id: string;
+  user_id: string;
+  kind: Kind;
+  parent_id: string | null;
+  payload: Payload;
+  version: number;
+  revision: number;
+  deleted: boolean;
+  updated_at: string;
 }
 export interface LocalRecord extends RecordRow {
-  module: Module
-  dirty?: boolean
-  conflict?: RecordRow
-  localRevision: number
+  module: Module;
+  dirty?: boolean;
+  conflict?: RecordRow;
+  localRevision: number;
 }
 export const moduleFor = (kind: Kind): Module =>
-  ['session', 'weight'].includes(kind) ? 'tracking' : 'training'
+  ['session', 'weight'].includes(kind) ? 'tracking' : 'training';
 export const mutationSchema = z
   .object({
     operationId: uuid,
@@ -184,21 +186,45 @@ export const mutationSchema = z
   })
   .strict()
   .superRefine((value, ctx) => {
-    const result = schemas[value.kind].safeParse(value.payload)
+    const result = schemas[value.kind].safeParse(value.payload);
     if (!result.success)
       ctx.addIssue({
         code: 'custom',
         message:
-          'Dati non validi: ' +
-          result.error.issues.map((i) => i.path.join('.') + ' ' + i.message).join('; '),
-      })
+          'Dati non validi: ' + result.error.issues.map((i) => i.path.join('.') + ' ' + i.message).join('; '),
+      });
+    if (value.kind === 'session' && result.success) {
+      const session = result.data as TrainingSession;
+      const recorded = session.exercises.flatMap((e) =>
+        e.actual.filter((s) => s.done).map((s) => ({ s, e })),
+      );
+      if (recorded.some(({ s, e }) => !validRecordedSet(s, e.measurement)))
+        ctx.addIssue({
+          code: 'custom',
+          message:
+            'Una serie registrata richiede ripetizioni intere positive o secondi positivi per le isometrie.',
+        });
+      if (session.completedAt && !recorded.length)
+        ctx.addIssue({ code: 'custom', message: 'Completa almeno una serie valida.' });
+    }
     if (['plan', 'workout'].includes(value.kind) !== !!value.parentId)
-      ctx.addIssue({ code: 'custom', message: 'Gerarchia non valida' })
-  })
-export type Mutation = z.infer<typeof mutationSchema>
-export const newTarget = (): Target => ({ reps: 8, rpe: 8, rir: 2, tut: null, load: null })
+      ctx.addIssue({ code: 'custom', message: 'Gerarchia non valida' });
+  });
+export type Mutation = z.infer<typeof mutationSchema>;
+export const newTarget = (measurement = 'reps'): Target => ({
+  reps: measurement === 'duration' ? null : 8,
+  rpe: 8,
+  rir: 2,
+  tut: measurement === 'duration' ? 30 : null,
+  load: null,
+});
+export function validRecordedSet(set: { reps: number | null; tut: number | null }, measurement = 'reps') {
+  return measurement === 'duration'
+    ? set.tut != null && set.tut > 0
+    : set.reps != null && Number.isInteger(set.reps) && set.reps > 0;
+}
 export function snapshotSession(workout: LocalRecord, bodyWeight: number | null): TrainingSession {
-  const w = workoutSchema.parse(workout.payload)
+  const w = workoutSchema.parse(workout.payload);
   return {
     name: w.name,
     workoutId: workout.id,
@@ -225,5 +251,5 @@ export function snapshotSession(workout: LocalRecord, bodyWeight: number | null)
       sessionNotes: '',
       substitutionReason: '',
     })),
-  }
+  };
 }

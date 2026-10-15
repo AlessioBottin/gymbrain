@@ -61,8 +61,8 @@ test('PWA updates automatically across tabs, defers workout reload and retains o
       name: 'FOCUS MODE · IL TUO ALLENAMENTO',
       exact: true,
     })
-    await session.getByRole('spinbutton', { name: 'Serie 1 load', exact: true }).fill('12.5')
-    await session.getByRole('spinbutton', { name: 'Serie 1 reps', exact: true }).fill('6')
+    await session.getByRole('textbox', { name: 'Serie 1 load', exact: true }).fill('12.5')
+    await session.getByRole('textbox', { name: 'Serie 1 reps', exact: true }).fill('6')
     await session.getByRole('button', { name: 'Completa serie 1', exact: true }).click()
     await expect(session.getByText('Salvato sul dispositivo', { exact: true })).toBeVisible()
     await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBeTruthy()
@@ -78,8 +78,8 @@ test('PWA updates automatically across tabs, defers workout reload and retains o
     await expect(page.locator('meta[name="test-release"]')).toHaveAttribute('content', 'one')
     await expect(session).toBeVisible()
     await expect(
-      session.getByRole('spinbutton', { name: 'Serie 1 load', exact: true }),
-    ).toHaveValue('12.5')
+      session.getByRole('textbox', { name: 'Serie 1 load', exact: true }),
+    ).toHaveValue('12,5')
     await page.bringToFront()
     await session.getByRole('button', { name: 'Chiudi', exact: true }).click()
     await expect(page.locator('meta[name="test-release"]')).toHaveAttribute('content', 'two', {
@@ -89,8 +89,8 @@ test('PWA updates automatically across tabs, defers workout reload and retains o
     await page.reload()
     await page.getByRole('button', { name: 'Riprendi sessione' }).click()
     await expect(
-      session.getByRole('spinbutton', { name: 'Serie 1 load', exact: true }),
-    ).toHaveValue('12.5')
+      session.getByRole('textbox', { name: 'Serie 1 load', exact: true }),
+    ).toHaveValue('12,5')
     await expect(session.getByRole('button', { name: 'Riapri serie 1', exact: true })).toBeVisible()
     const queued = await page.evaluate(
       () =>

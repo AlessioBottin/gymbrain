@@ -1,0 +1,182 @@
+/* A quiet glass layer over one persistent sculpture. */
+.cta-translation {
+  display: block;
+  font-size: 10px;
+  font-weight: 400;
+  margin-top: 4px;
+  opacity: 0.88;
+}
+.actual-grid.isometric {
+  grid-template-columns: 45px repeat(4, minmax(0, 1fr)) 40px;
+}
+.target-editor.isometric {
+  grid-template-columns: 18px repeat(4, minmax(0, 1fr)) 24px;
+}
+@media (max-width: 690px) {
+  .actual-grid.isometric {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .reveal-ready {
+    opacity: 0;
+    transform: translateY(var(--reveal-offset, 28px)) scale(0.985);
+    transition:
+      opacity 0.65s ease,
+      transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .reveal-ready.is-revealed,
+  .reveal-ready:focus-within {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+:root {
+  --bg: #f2efe9;
+  --line: #685a4e24;
+  --muted: #665e56;
+}
+.ambient {
+  background: radial-gradient(ellipse at 10% 15%, #fffdf7a0, transparent 65%);
+}
+.marble-sculpture {
+  right: -3vw;
+  bottom: -8dvh;
+  width: min(1000px, 85vw);
+  height: 112dvh;
+  opacity: 0.74;
+  background-position: 83% center;
+  background-size: auto 112%;
+  mask-image: linear-gradient(90deg, transparent, #000 28%, #000 90%, transparent);
+  animation: none;
+}
+.sidebar {
+  background: #faf8f144;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-color: #ffffff70;
+}
+.panel,
+.hero,
+.auth-story,
+.auth-form,
+.guided-path button {
+  background: #fffdf766;
+  border: 1px solid #ffffffa6;
+  box-shadow:
+    0 8px 32px #44322205,
+    inset 0 1px #ffffff88;
+  backdrop-filter: blur(9px);
+  -webkit-backdrop-filter: blur(9px);
+  border-radius: 20px;
+}
+.hero,
+.auth-story {
+  background-image: none;
+}
+.hero {
+  min-height: 310px;
+}
+.hero h2 {
+  max-width: 80%;
+}
+.hero p {
+  max-width: 75%;
+}
+.hero-bottom .text-btn,
+.secondary {
+  background: #fffdf76b;
+  border-color: #6e5b492b;
+}
+.intro h1 {
+  font-size: clamp(34px, 3.2vw, 50px);
+}
+.eyebrow,
+.side-label {
+  letter-spacing: 0.16em;
+}
+nav button.active {
+  background: #8b2e350c;
+}
+.primary {
+  box-shadow: none;
+}
+.pill,
+.comparison-row,
+.guided-path button {
+  border-color: #6e5b4924;
+}
+input,
+select,
+textarea {
+  background: #fffdfac9;
+  border-color: #8c7d6b55;
+}
+dialog {
+  background: #fbf8f0e8;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+dialog::backdrop {
+  background: #30272024;
+  backdrop-filter: blur(2px);
+}
+.session-actions {
+  background: #fbf8f0ed;
+}
+.side-bottom,
+.profile small,
+.profile strong,
+.quote,
+.quote p,
+.exercise-row > span,
+.exercise-row svg,
+.exercise-info small {
+  color: var(--muted);
+}
+.day-tab,
+.day-tabs button,
+.week-track span {
+  color: var(--muted);
+}
+.day-tab.active,
+.day-tabs button.active {
+  background: #8b2e350a;
+  border-color: #8b2e3533;
+  color: var(--lime);
+}
+@media (max-width: 690px) {
+  .marble-sculpture {
+    width: 120vw;
+    height: 105dvh;
+    right: -25vw;
+    bottom: -3dvh;
+    opacity: 0.63;
+    mask-image: linear-gradient(90deg, transparent, #000 25%);
+  }
+  .panel,
+  .hero,
+  .auth-story,
+  .auth-form {
+    background-color: #fffdf773;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+  .hero {
+    min-height: 300px;
+  }
+  .hero h2 {
+    max-width: 90%;
+  }
+  .sidebar {
+    background: #fffdf7bd;
+  }
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .panel,
+  .hero,
+  .auth-form,
+  .auth-story {
+    background-color: #fffdf7d9;
+  }
+}

@@ -16,10 +16,10 @@ test('Chrome desktop: create a plan, log a session, reload offline and finish wi
   })
   await page.getByRole('button', { name: 'Entra in allenamento' }).click()
   const session = page.getByRole('dialog', { name: 'FOCUS MODE · IL TUO ALLENAMENTO', exact: true })
-  await session.getByRole('spinbutton', { name: 'Serie 1 reps', exact: true }).fill('6')
-  await session.getByRole('spinbutton', { name: 'Serie 1 load', exact: true }).fill('12.5')
-  await session.getByRole('spinbutton', { name: 'Serie 1 rpe', exact: true }).fill('8')
-  await session.getByRole('spinbutton', { name: 'Serie 1 rir', exact: true }).fill('2')
+  await session.getByRole('textbox', { name: 'Serie 1 reps', exact: true }).fill('6')
+  await session.getByRole('textbox', { name: 'Serie 1 load', exact: true }).fill('12.5')
+  await session.getByRole('textbox', { name: 'Serie 1 rpe', exact: true }).fill('8')
+  await session.getByRole('textbox', { name: 'Serie 1 rir', exact: true }).fill('2')
   await session.getByRole('button', { name: 'Completa serie 1', exact: true }).click()
   await expect(session.getByRole('button', { name: 'Riapri serie 1', exact: true })).toBeVisible()
   await expect(session.getByText('Salvato sul dispositivo', { exact: true })).toBeVisible()
@@ -29,8 +29,8 @@ test('Chrome desktop: create a plan, log a session, reload offline and finish wi
   await context.setOffline(true)
   await page.reload()
   await page.getByRole('button', { name: 'Riprendi sessione' }).click()
-  await expect(session.getByRole('spinbutton', { name: 'Serie 1 load', exact: true })).toHaveValue(
-    '12.5',
+  await expect(session.getByRole('textbox', { name: 'Serie 1 load', exact: true })).toHaveValue(
+    '12,5',
   )
   await expect(session.getByRole('button', { name: 'Riapri serie 1', exact: true })).toBeVisible()
   await session.getByRole('button', { name: '2. Dip alle parallele' }).click()
@@ -43,7 +43,7 @@ test('Chrome desktop: create a plan, log a session, reload offline and finish wi
   await swap.getByRole('button', { name: 'Applica sostituzione' }).click()
   await session.getByLabel('GORNATION Ultra Light').check()
   await session.getByLabel('Banda e configurazione').fill('Banda verde, singola')
-  await session.getByRole('spinbutton', { name: 'Serie 1 reps', exact: true }).fill('8')
+  await session.getByRole('textbox', { name: 'Serie 1 reps', exact: true }).fill('8')
   await session.getByRole('button', { name: 'Completa serie 1', exact: true }).click()
   await session.getByRole('button', { name: 'Concludi', exact: true }).click()
   await page.getByRole('button', { name: 'Salva allenamento', exact: true }).click()

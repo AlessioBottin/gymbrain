@@ -19,8 +19,8 @@ export default defineNuxtConfig({
       short_name: 'Gymbrain',
       description: 'Il tuo ritmo. Il tuo percorso.',
       lang: 'it',
-      theme_color: '#10130f',
-      background_color: '#10130f',
+      theme_color: '#f4f1ea',
+      background_color: '#f4f1ea',
       display: 'standalone',
       start_url: '/',
       icons: [
@@ -30,7 +30,7 @@ export default defineNuxtConfig({
       ],
     },
     workbox: {
-      globPatterns: ['**/*.{js,css,html,png,svg,woff2}'],
+      globPatterns: ['**/*.{js,css,html,png,svg,webp,woff2}'],
       navigateFallback: '/',
       navigateFallbackDenylist: [/^\/api\//],
       cleanupOutdatedCaches: true,
@@ -38,13 +38,13 @@ export default defineNuxtConfig({
     },
     client: { registerPlugin: false },
   },
-  css: ['~/assets/main.css', '~/assets/application.css'],
+  css: ['~/assets/main.css', '~/assets/application.css', '~/assets/greek.css', '~/assets/glass.css'],
   app: {
     head: {
       title: 'Gymbrain — Il tuo prossimo livello',
       htmlAttrs: { lang: 'it' },
       meta: [
-        { name: 'theme-color', content: '#111510' },
+        { name: 'theme-color', content: '#f4f1ea' },
         {
           name: 'description',
           content: 'Allenati con intenzione. Schede, sessioni e progressi anche offline.',
@@ -57,4 +57,4 @@ export default defineNuxtConfig({
       ],
     },
   },
-})
+});

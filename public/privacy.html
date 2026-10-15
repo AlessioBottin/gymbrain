@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Privacy · Gymbrain</title>
+  <style>
+    :root { color-scheme: light; font: 16px/1.75 system-ui, sans-serif; color: #292522; background: #f4f1ea; }
+    body { max-width: 760px; margin: auto; padding: 40px 24px 70px; }
+    a { color: #8b2e35; overflow-wrap: anywhere; }
+    h1 { font: 48px/1.15 Georgia, serif; margin-bottom: 16px; }
+    h2 { font-size: 20px; margin-top: 32px; }
+    .brand { font-weight: 700; text-decoration: none; }
+    .date { color: #70675f; font-size: 14px; }
+    .notice { border-left: 3px solid #8b2e35; padding: 12px 20px; background: #fffdfa; }
+    li { margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <a class="brand" href="/">gymbrain</a>
+  <h1>La tua privacy.</h1>
+  <p class="date">Informazioni aggiornate al 15 ottobre 2026</p>
+  <p>Gymbrain è un progetto privato condiviso tra amici per organizzare allenamenti
+    e consultare i propri progressi. È gestito da <strong>Alessio Bottin</strong>.
+    Per informazioni e richieste sui tuoi dati puoi scrivere a
+    <a href="mailto:alessiobottin2002@gmail.com">alessiobottin2002@gmail.com</a>.</p>
+
+  <h2>Quali dati vengono utilizzati</h2>
+  <p>Se utilizzi un account, Gymbrain tratta email, identificativo e nome visualizzato,
+    insieme ai dati che inserisci: esercizi, schede, note, serie, ripetizioni o secondi,
+    carichi, valutazioni dello sforzo, sessioni, peso corporeo ed eventuali video caricati.
+    I servizi tecnici possono inoltre trattare dati di connessione e log necessari al funzionamento.</p>
+  <p>Questi dati servono a fornire il diario richiesto, sincronizzarlo tra i tuoi dispositivi
+    e mostrarti riepiloghi dei tuoi allenamenti. Non inserire nelle note o nei video
+    informazioni di altre persone che non desiderano condividerle.</p>
+
+  <h2>Collegamenti facoltativi a WHOOP e Withings</h2>
+  <p>Il diario può essere usato senza collegare questi servizi. Quando un'integrazione
+    è disponibile e scegli di autorizzarla, Gymbrain riceve dal relativo fornitore:</p>
+  <ul>
+    <li><strong>WHOOP:</strong> dati storici e nuovi relativi a recupero, HRV, frequenza cardiaca,
+      sonno, cicli giornalieri e attività, inclusi strain, punteggi e orari.
+      L'identificativo WHOOP associa il collegamento al tuo account Gymbrain.</li>
+    <li><strong>Withings:</strong> misurazioni di peso, date e identificativi necessari
+      a importarle nel diario senza duplicarle.</li>
+  </ul>
+  <p>Gymbrain conserva i record restituiti dagli endpoint autorizzati, che possono includere
+    più dettagli di quelli mostrati nei riepiloghi. Li usa per confrontare il contesto di
+    recupero con gli allenamenti e associare le attività alle sessioni. Non invia il diario
+    degli allenamenti a WHOOP. Non conserva il nome o l'email ricevuti dall'endpoint del profilo WHOOP.</p>
+  <p>L'accesso avviene sul sito del fornitore. Gymbrain non riceve le password WHOOP o Withings;
+    i token del collegamento vengono conservati cifrati sul server. I fornitori applicano
+    anche le proprie informative. I confronti di Gymbrain non sono diagnosi mediche e
+    non determinano decisioni con effetti giuridici sulla persona.</p>
+  <p class="notice"><strong>Scollegare non significa cancellare lo storico.</strong>
+    Lo scollegamento interrompe l'importazione e rimuove i token del collegamento,
+    ma i dati già importati restano nel diario. Per richiederne la cancellazione,
+    contatta il gestore all'indirizzo indicato sopra.</p>
+
+  <h2>Dove vengono trattati i dati</h2>
+  <p>Gymbrain usa Supabase per autenticazione, database e file, Render per il backend
+    e Brevo per le email transazionali di accesso. Le email di accesso non richiedono
+    l'invio dei tuoi dati di allenamento o recupero. WHOOP e Withings vengono contattati
+    per le integrazioni che scegli di collegare.</p>
+  <p>La configurazione di hosting non implica che ogni trattamento dei fornitori avvenga
+    esclusivamente in Italia o nell'Unione europea. Puoi chiedere al gestore informazioni
+    sulla configurazione e sui fornitori utilizzati.</p>
+
+  <h2>Conservazione e memoria del dispositivo</h2>
+  <p>La versione attuale conserva il diario e i dati importati senza una scadenza automatica
+    generale. Alcune eliminazioni dall'interfaccia sono logiche, per consentire la
+    sincronizzazione, e non rimuovono immediatamente tutte le copie dal database.
+    Non è presente un pulsante per cancellare l'intero account cloud: le richieste
+    di cancellazione vanno rivolte al gestore. Eventuali copie di backup e log dei fornitori
+    seguono le relative configurazioni di conservazione.</p>
+  <p>Per funzionare offline, Gymbrain usa memoria locale, IndexedDB e cache della PWA,
+    incluse bozze e modifiche in attesa di sincronizzazione. In modalità “Solo dispositivo”
+    il diario non viene sincronizzato con un account; il caricamento del sito può comunque
+    generare richieste e log tecnici. Cancellare i dati del sito dal browser può far perdere
+    modifiche non sincronizzate. Uscire dall'account non cancella i dati cloud.</p>
+  <p>I collegamenti OAuth utilizzano cookie tecnici temporanei per verificare il ritorno
+    dal fornitore. Nell'app non sono integrati strumenti pubblicitari o di analytics di terzi.</p>
+
+  <h2>Le tue richieste</h2>
+  <p>Puoi contattare Alessio Bottin per chiedere informazioni, accesso o una copia dei tuoi dati,
+    correzione e cancellazione. Nei casi previsti dalla normativa applicabile puoi esercitare
+    anche limitazione, opposizione e portabilità, revocare un consenso prestato e presentare
+    reclamo all'autorità di controllo competente. La revoca non modifica la liceità del
+    trattamento precedente. In Italia l'autorità è il
+    <a href="https://www.garanteprivacy.it/">Garante per la protezione dei dati personali</a>.</p>
+  <p>Per qualsiasi dubbio prima di collegare un servizio:
+    <a href="mailto:alessiobottin2002@gmail.com">alessiobottin2002@gmail.com</a>.</p>
+</body>
+</html>

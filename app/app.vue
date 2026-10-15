@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { createClient, type SupabaseClient, type Session } from '@supabase/supabase-js'
-import { liveQuery } from 'dexie'
-import { db, saveRecord, synchronize, removeAccountCache, resolveConflict } from './lib/store'
-import { createStarter } from './lib/sample'
+import { createClient, type SupabaseClient, type Session } from '@supabase/supabase-js';
+import { liveQuery } from 'dexie';
+import { useImmersiveMotion } from './composables/useImmersiveMotion';
+import { db, saveRecord, synchronize, removeAccountCache, resolveConflict } from './lib/store';
+import { createStarter } from './lib/sample';
 import {
   snapshotSession,
   type LocalRecord,
@@ -11,15 +12,15 @@ import {
   type Workout,
   type TrainingSession,
   type Payload,
-} from '../shared/domain'
+} from '../shared/domain';
 const cfg = useRuntimeConfig(),
   auth = shallowRef<SupabaseClient | null>(null),
   authSession = ref<Session | null>(null),
   recovery = ref(false),
   ready = ref(false),
-  local = ref(false)
+  local = ref(false);
 const cachedIdentity = ref<{ id: string; name: string; email: string } | null>(null),
-  reauth = ref(false)
+  reauth = ref(false);
 const owner = computed(
     () =>
       authSession.value?.user.id ||
@@ -31,7 +32,7 @@ const owner = computed(
       authSession.value?.user.user_metadata?.display_name ||
       (!local.value ? cachedIdentity.value?.name : '') ||
       'Atleta',
-  )
+  );
 const rows = ref<LocalRecord[]>([]),
   pending = ref(0),
   view = ref('oggi'),
@@ -44,8 +45,14 @@ const rows = ref<LocalRecord[]>([]),
   planId = ref(''),
   workoutId = ref(''),
   sessionRecord = ref<LocalRecord | null>(null),
-  focusMode = ref(false)
-const withings = useWithings(auth, owner, local, online, sync)
+  focusMode = ref(false);
+const withings = useWithings(auth, owner, local, online, sync);
+const whoop = useWhoop(auth, owner, local, online);
+useImmersiveMotion();
+watch(view, async () => {
+  await nextTick();
+  window.scrollTo({ top: 0, behavior: 'instant' });
+});
 const updates = useAppUpdates(
   computed(
     () =>
@@ -54,10 +61,11 @@ const updates = useAppUpdates(
       focusMode.value ||
       busy.value ||
       withings.loading.value ||
+      whoop.loading.value ||
       reauth.value ||
       recovery.value,
   ),
-)
+);
 const editor = reactive<{ open: boolean; kind: Kind; record?: LocalRecord; parentId?: string }>({
     open: false,
     kind: 'exercise',
@@ -66,7 +74,7 @@ const editor = reactive<{ open: boolean; kind: Kind; record?: LocalRecord; paren
   logoutOpen = ref(false),
   historyRecord = ref<LocalRecord | null>(null),
   videoUrl = ref(''),
-  conflictRecord = ref<LocalRecord | null>(null)
+  conflictRecord = ref<LocalRecord | null>(null);
 const catalog = computed(() => rows.value.filter((r) => r.kind === 'exercise' && !r.deleted)),
   cycles = computed(() => rows.value.filter((r) => r.kind === 'cycle' && !r.deleted)),
   cycle = computed(() => cycles.value.find((r) => r.id === cycleId.value) || cycles.value[0]),
@@ -81,22 +89,16 @@ const catalog = computed(() => rows.value.filter((r) => r.kind === 'exercise' &&
       .filter((r) => r.kind === 'workout' && r.parent_id === plan.value?.id && !r.deleted)
       .sort((a, b) => (a.payload as Workout).order - (b.payload as Workout).order),
   ),
-  workout = computed(
-    () => workouts.value.find((r) => r.id === workoutId.value) || workouts.value[0],
-  ),
-  workoutData = computed(() => workout.value?.payload as Workout | undefined)
+  workout = computed(() => workouts.value.find((r) => r.id === workoutId.value) || workouts.value[0]),
+  workoutData = computed(() => workout.value?.payload as Workout | undefined);
 const sessions = computed(() =>
     rows.value
       .filter((r) => r.kind === 'session' && !r.deleted)
       .sort((a, b) =>
-        (b.payload as TrainingSession).startedAt.localeCompare(
-          (a.payload as TrainingSession).startedAt,
-        ),
+        (b.payload as TrainingSession).startedAt.localeCompare((a.payload as TrainingSession).startedAt),
       ),
   ),
-  completed = computed(() =>
-    sessions.value.filter((r) => (r.payload as TrainingSession).completedAt),
-  ),
+  completed = computed(() => sessions.value.filter((r) => (r.payload as TrainingSession).completedAt)),
   ongoing = computed(() => sessions.value.find((r) => !(r.payload as TrainingSession).completedAt)),
   weights = computed(() =>
     rows.value
@@ -114,108 +116,102 @@ const sessions = computed(() =>
     catalog.value.filter((r) =>
       (r.payload as Exercise).name.toLowerCase().includes(search.value.toLowerCase()),
     ),
-  )
+  );
 const modeNames: Record<string, string> = {
   bodyweight: 'Corpo libero',
   weighted: 'Zavorra',
   external: 'Carico esterno',
   band: 'Banda elastica',
-}
+};
 const week = computed(() =>
   cycle.value
     ? Math.max(
         1,
         Math.min(
           (cycle.value.payload as any).weeks,
-          Math.floor(
-            (Date.now() - new Date((cycle.value.payload as any).start).getTime()) / 604800000,
-          ) + 1,
+          Math.floor((Date.now() - new Date((cycle.value.payload as any).start).getTime()) / 604800000) + 1,
         ),
       )
     : 1,
-)
+);
 const monday = () => {
-  const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
-  return d
-}
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d;
+};
 const weekly = computed(() =>
   completed.value.filter((r) => new Date((r.payload as TrainingSession).completedAt!) >= monday()),
-)
+);
 const activity = computed(() =>
   Array.from({ length: 7 }, (_, i) =>
-    weekly.value.some(
-      (r) => (new Date((r.payload as TrainingSession).completedAt!).getDay() + 6) % 7 === i,
-    ),
+    weekly.value.some((r) => (new Date((r.payload as TrainingSession).completedAt!).getDay() + 6) % 7 === i),
   ),
-)
+);
 const graph = computed(() => {
-  const values = weights.value.slice(-14).map((r) => (r.payload as any).kg as number)
-  if (values.length < 2) return ''
+  const values = weights.value.slice(-14).map((r) => (r.payload as any).kg as number);
+  if (values.length < 2) return '';
   const min = Math.min(...values) - 0.2,
-    range = Math.max(...values) - min + 0.2
+    range = Math.max(...values) - min + 0.2;
   return values
-    .map(
-      (n, i) =>
-        `${i ? 'L' : 'M'}${(i / (values.length - 1)) * 280},${68 - ((n - min) / range) * 60}`,
-    )
-    .join(' ')
-})
+    .map((n, i) => `${i ? 'L' : 'M'}${(i / (values.length - 1)) * 280},${68 - ((n - min) / range) * 60}`)
+    .join(' ');
+});
 let unsubscribe: (() => void) | undefined,
   authSubscription: { unsubscribe: () => void } | undefined,
   interval: ReturnType<typeof setInterval> | undefined,
   toastTimer: ReturnType<typeof setTimeout>,
-  syncing = false
+  syncing = false;
 function notify(message: string) {
-  toast.value = message
+  toast.value = message;
   void nextTick(() => {
-    const node = document.getElementById('toast') as HTMLElement | null
-    if (node?.showPopover && !node.matches(':popover-open')) node.showPopover()
-  })
-  clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => (toast.value = ''), 5000)
+    const node = document.getElementById('toast') as HTMLElement | null;
+    if (node?.showPopover && !node.matches(':popover-open')) node.showPopover();
+  });
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (toast.value = ''), 5000);
 }
 async function sync() {
-  if (syncing || !owner.value) return
+  if (syncing || !owner.value) return;
   if (local.value) {
-    status.value = 'Solo dispositivo'
-    return
+    status.value = 'Solo dispositivo';
+    return;
   }
-  const id = owner.value
-  syncing = true
+  const id = owner.value;
+  syncing = true;
   try {
     await synchronize(
       id,
       async () => {
-        const { data } = await auth.value!.auth.getSession()
-        return data.session?.user.id === id ? data.session.access_token : null
+        const { data } = await auth.value!.auth.getSession();
+        return data.session?.user.id === id ? data.session.access_token : null;
       },
       (s) => {
-        if (owner.value === id) status.value = s
+        if (owner.value === id) status.value = s;
       },
-    )
+    );
   } finally {
-    syncing = false
+    syncing = false;
   }
 }
 async function observeOwner() {
-  unsubscribe?.()
-  rows.value = []
-  pending.value = 0
-  sessionRecord.value = null
-  focusMode.value = false
-  cycleId.value = ''
-  planId.value = ''
-  workoutId.value = ''
-  const id = owner.value
-  if (!id) return
-  const saved = (await db.meta.get(id + ':selection'))?.value
-  if (owner.value !== id) return
+  editor.open = false;
+  unsubscribe?.();
+  rows.value = [];
+  pending.value = 0;
+  sessionRecord.value = null;
+  focusMode.value = false;
+  cycleId.value = '';
+  planId.value = '';
+  workoutId.value = '';
+  const id = owner.value;
+  if (!id) return;
+  const saved = (await db.meta.get(id + ':selection'))?.value;
+  if (owner.value !== id) return;
   if (saved) {
-    cycleId.value = saved.cycle || ''
-    planId.value = saved.plan || ''
-    workoutId.value = saved.workout || ''
+    cycleId.value = saved.cycle || '';
+    planId.value = saved.plan || '';
+    workoutId.value = saved.workout || '';
   }
   const sub = liveQuery(async () => ({
     records: await db.records.where('user_id').equals(id).toArray(),
@@ -223,80 +219,80 @@ async function observeOwner() {
   })).subscribe({
     next: (value) => {
       if (owner.value === id) {
-        rows.value = value.records
-        pending.value = value.pending
+        rows.value = value.records;
+        pending.value = value.pending;
       }
     },
     error: () => notify('Impossibile aprire l’archivio del dispositivo.'),
-  })
-  unsubscribe = () => sub.unsubscribe()
-  void sync()
+  });
+  unsubscribe = () => sub.unsubscribe();
+  void sync();
 }
-watch(owner, observeOwner)
+watch(owner, observeOwner);
 watch([cycleId, planId, workoutId], () => {
   if (owner.value)
     void db.meta.put({
       key: owner.value + ':selection',
       value: { cycle: cycleId.value, plan: planId.value, workout: workoutId.value },
-    })
-})
+    });
+});
 function connectivity() {
-  online.value = navigator.onLine
-  if (online.value) void sync()
-  else status.value = 'Offline · salvato sul dispositivo'
+  online.value = navigator.onLine;
+  if (online.value) void sync();
+  else status.value = 'Offline · salvato sul dispositivo';
 }
 onMounted(async () => {
   try {
-    cachedIdentity.value = JSON.parse(localStorage.getItem('gymbrain-last-account') || 'null')
+    cachedIdentity.value = JSON.parse(localStorage.getItem('gymbrain-last-account') || 'null');
   } catch {}
-  online.value = navigator.onLine
-  window.addEventListener('online', connectivity)
-  window.addEventListener('offline', connectivity)
+  online.value = navigator.onLine;
+  window.addEventListener('online', connectivity);
+  window.addEventListener('offline', connectivity);
   if (cfg.public.supabaseUrl && cfg.public.supabaseKey) {
-    auth.value = createClient(String(cfg.public.supabaseUrl), String(cfg.public.supabaseKey))
+    auth.value = createClient(String(cfg.public.supabaseUrl), String(cfg.public.supabaseKey));
     const { data } = auth.value.auth.onAuthStateChange((event, session) => {
-      authSession.value = session
+      authSession.value = session;
       if (session) {
-        local.value = false
-        localStorage.removeItem('gymbrain-local')
-        reauth.value = false
+        local.value = false;
+        localStorage.removeItem('gymbrain-local');
+        reauth.value = false;
         cachedIdentity.value = {
           id: session.user.id,
           name: session.user.user_metadata?.display_name || 'Atleta',
           email: session.user.email || '',
-        }
-        localStorage.setItem('gymbrain-last-account', JSON.stringify(cachedIdentity.value))
+        };
+        localStorage.setItem('gymbrain-last-account', JSON.stringify(cachedIdentity.value));
       }
-      if (event === 'PASSWORD_RECOVERY') recovery.value = true
-    })
-    authSubscription = data.subscription
+      if (event === 'PASSWORD_RECOVERY') recovery.value = true;
+    });
+    authSubscription = data.subscription;
     if (navigator.onLine) {
-      const session = await auth.value.auth.getSession()
-      authSession.value = session.data.session
+      const session = await auth.value.auth.getSession();
+      authSession.value = session.data.session;
     }
   }
   local.value =
     Boolean(cfg.public.allowLocalDemo) &&
     !authSession.value &&
-    localStorage.getItem('gymbrain-local') === 'yes'
-  ready.value = true
-  interval = setInterval(() => void sync(), 30000)
-})
+    localStorage.getItem('gymbrain-local') === 'yes';
+  ready.value = true;
+  interval = setInterval(() => void sync(), 30000);
+});
 onUnmounted(() => {
-  unsubscribe?.()
-  authSubscription?.unsubscribe()
-  clearInterval(interval)
-  clearTimeout(toastTimer)
-  window.removeEventListener('online', connectivity)
-  window.removeEventListener('offline', connectivity)
-})
+  unsubscribe?.();
+  authSubscription?.unsubscribe();
+  clearInterval(interval);
+  clearTimeout(toastTimer);
+  window.removeEventListener('online', connectivity);
+  window.removeEventListener('offline', connectivity);
+});
 function enterLocal() {
-  if (!cfg.public.allowLocalDemo) return
-  localStorage.setItem('gymbrain-local', 'yes')
-  local.value = true
+  if (!cfg.public.allowLocalDemo) return;
+  localStorage.setItem('gymbrain-local', 'yes');
+  local.value = true;
 }
 function openEditor(kind: Kind, record?: LocalRecord, parentId?: string) {
-  Object.assign(editor, { open: true, kind, record, parentId })
+  Object.assign(editor, { open: true, kind, record, parentId });
 }
 async function save(
   kind: Kind,
@@ -306,104 +302,105 @@ async function save(
   expectedRevision?: number,
 ) {
   try {
-    await saveRecord(owner.value, kind, payload, { id, parentId, expectedRevision })
-    editor.open = false
-    notify('Salvato sul dispositivo')
-    void sync()
+    await saveRecord(owner.value, kind, payload, { id, parentId, expectedRevision });
+    editor.open = false;
+    localStorage.removeItem(`gymbrain-draft:${owner.value}:${kind}:${id || parentId || 'new'}`);
+    notify('Salvato sul dispositivo');
+    void sync();
   } catch (e) {
-    notify(e instanceof Error ? e.message : 'Salvataggio non riuscito')
+    notify(e instanceof Error ? e.message : 'Salvataggio non riuscito');
   }
 }
 async function seed() {
-  busy.value = true
+  busy.value = true;
   try {
-    const result = await createStarter(owner.value)
-    cycleId.value = result.cycle
-    planId.value = result.plan
-    notify('Percorso iniziale creato: puoi personalizzarlo.')
-    void sync()
+    const result = await createStarter(owner.value);
+    cycleId.value = result.cycle;
+    planId.value = result.plan;
+    notify('Percorso iniziale creato: puoi personalizzarlo.');
+    void sync();
   } catch (e) {
-    notify(String(e))
+    notify(String(e));
   } finally {
-    busy.value = false
+    busy.value = false;
   }
 }
 async function start() {
   try {
     if (ongoing.value) {
-      sessionRecord.value = ongoing.value
-      focusMode.value = true
-      return
+      sessionRecord.value = ongoing.value;
+      focusMode.value = true;
+      return;
     }
     if (!workout.value || !workoutData.value?.exercises.length) {
-      notify('Aggiungi almeno un esercizio alla giornata.')
-      return
+      notify('Aggiungi almeno un esercizio alla giornata.');
+      return;
     }
     sessionRecord.value = await saveRecord(
       owner.value,
       'session',
       snapshotSession(workout.value, latestWeight.value?.kg ?? null),
-    )
-    focusMode.value = true
+    );
+    focusMode.value = true;
   } catch (e) {
-    notify(String(e))
+    notify(String(e));
   }
 }
 async function sessionComplete() {
-  focusMode.value = false
+  focusMode.value = false;
   const i = workouts.value.findIndex(
     (w) => w.id === (sessionRecord.value!.payload as TrainingSession).workoutId,
-  )
-  workoutId.value = workouts.value[(i + 1) % workouts.value.length]?.id || ''
-  view.value = 'progressi'
-  notify('Allenamento salvato. Un passo in più.')
-  void sync()
+  );
+  workoutId.value = workouts.value[(i + 1) % workouts.value.length]?.id || '';
+  view.value = 'progressi';
+  notify('Allenamento salvato. Un passo in più.');
+  void sync();
 }
 async function destroy() {
-  const r = deleteRecord.value
-  if (!r) return
+  const r = deleteRecord.value;
+  if (!r) return;
   try {
     if (rows.value.some((x) => x.parent_id === r.id && !x.deleted))
-      throw new Error('Elimina prima gli elementi contenuti.')
+      throw new Error('Elimina prima gli elementi contenuti.');
     await saveRecord(owner.value, r.kind, r.payload, {
       id: r.id,
       deleted: true,
       expectedRevision: r.localRevision,
-    })
-    deleteRecord.value = null
-    notify('Elemento eliminato. Lo storico delle sessioni resta intatto.')
-    void sync()
+    });
+    deleteRecord.value = null;
+    notify('Elemento eliminato. Lo storico delle sessioni resta intatto.');
+    void sync();
   } catch (e) {
-    notify(String(e))
+    notify(String(e));
   }
 }
 async function logout() {
   if (!local.value && pending.value) {
-    notify('Sincronizza o risolvi i conflitti prima di uscire. Puoi esportare i dati.')
-    return
+    notify('Sincronizza o risolvi i conflitti prima di uscire. Puoi esportare i dati.');
+    return;
   }
   if (syncing) {
-    notify('Attendi il termine della sincronizzazione.')
-    return
+    notify('Attendi il termine della sincronizzazione.');
+    return;
   }
-  const id = owner.value
+  const id = owner.value;
   if (auth.value && !local.value) {
-    const { error } = await auth.value.auth.signOut({ scope: 'local' })
+    const { error } = await auth.value.auth.signOut({ scope: 'local' });
     if (error) {
-      notify(error.message)
-      return
+      notify(error.message);
+      return;
     }
-    await removeAccountCache(id)
+    await removeAccountCache(id);
   } else if (!local.value) {
-    await removeAccountCache(id)
+    await removeAccountCache(id);
   }
-  cachedIdentity.value = null
-  localStorage.removeItem('gymbrain-last-account')
-  reauth.value = false
-  local.value = false
-  localStorage.removeItem('gymbrain-local')
-  logoutOpen.value = false
-  view.value = 'oggi'
+  cachedIdentity.value = null;
+  localStorage.removeItem('gymbrain-last-account');
+  reauth.value = false;
+  local.value = false;
+  localStorage.removeItem('gymbrain-local');
+  logoutOpen.value = false;
+  view.value = 'oggi';
 }
 function exportData() {
   const blob = new Blob(
@@ -415,17 +412,17 @@ function exportData() {
       ),
     ],
     { type: 'application/json' },
-  )
+  );
   const url = URL.createObjectURL(blob),
-    a = document.createElement('a')
-  a.href = url
-  a.download = 'gymbrain-' + new Date().toISOString().slice(0, 10) + '.json'
-  a.click()
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
+    a = document.createElement('a');
+  a.href = url;
+  a.download = 'gymbrain-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 async function mediaRequest(endpoint: string, body: unknown) {
-  const { data } = await auth.value!.auth.getSession()
-  if (!data.session) throw new Error('Accedi di nuovo')
+  const { data } = await auth.value!.auth.getSession();
+  if (!data.session) throw new Error('Accedi di nuovo');
   const response = await fetch('/api/media/' + endpoint, {
     method: 'POST',
     headers: {
@@ -434,77 +431,75 @@ async function mediaRequest(endpoint: string, body: unknown) {
     },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(75000),
-  })
-  const result = await response.json()
-  if (!response.ok) throw new Error(result.error || 'Operazione non disponibile')
-  return result
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || 'Operazione non disponibile');
+  return result;
 }
 async function uploadVideo(row: LocalRecord, event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0]
-  if (!file) return
+  const file = (event.target as HTMLInputElement).files?.[0];
+  if (!file) return;
   if (!auth.value || local.value || !online.value) {
-    notify('Collega un account e torna online per caricare video.')
-    return
+    notify('Collega un account e torna online per caricare video.');
+    return;
   }
-  if (
-    file.size > 25 * 1024 * 1024 ||
-    !['video/mp4', 'video/webm', 'video/quicktime'].includes(file.type)
-  ) {
-    notify('Scegli un video MP4, WebM o MOV fino a 25 MB.')
-    return
+  if (file.size > 25 * 1024 * 1024 || !['video/mp4', 'video/webm', 'video/quicktime'].includes(file.type)) {
+    notify('Scegli un video MP4, WebM o MOV fino a 25 MB.');
+    return;
   }
-  busy.value = true
+  busy.value = true;
   try {
     const id = owner.value,
       upload = await mediaRequest('upload-url', { type: file.type, size: file.size }),
-      path = upload.path
+      path = upload.path;
     const { error } = await auth.value.storage
       .from('exercise-videos')
-      .uploadToSignedUrl(path, upload.token, file, { contentType: file.type })
-    if (error) throw error
+      .uploadToSignedUrl(path, upload.token, file, { contentType: file.type });
+    if (error) throw error;
     await saveRecord(
       id,
       'exercise',
       { ...(row.payload as Exercise), videoPath: path },
       { id: row.id, expectedRevision: row.localRevision },
-    )
-    notify('Video allegato.')
-    void sync()
+    );
+    notify('Video allegato.');
+    void sync();
   } catch (e) {
-    notify(String(e))
+    notify(String(e));
   } finally {
-    busy.value = false
-    ;(event.target as HTMLInputElement).value = ''
+    busy.value = false;
+    (event.target as HTMLInputElement).value = '';
   }
 }
 async function playVideo(row: LocalRecord) {
-  const e = row.payload as Exercise
+  const e = row.payload as Exercise;
   if (e.videoPath) {
     if (!auth.value || !online.value) {
-      notify('Questo allegato richiede una connessione.')
-      return
+      notify('Questo allegato richiede una connessione.');
+      return;
     }
     try {
-      videoUrl.value = (await mediaRequest('download-url', { path: e.videoPath })).url
+      videoUrl.value = (await mediaRequest('download-url', { path: e.videoPath })).url;
     } catch (error) {
-      notify(error instanceof Error ? error.message : 'Video non disponibile')
+      notify(error instanceof Error ? error.message : 'Video non disponibile');
     }
   } else if (e.videoUrl) {
-    window.open(e.videoUrl, '_blank', 'noopener,noreferrer')
+    window.open(e.videoUrl, '_blank', 'noopener,noreferrer');
   }
 }
 async function resolve(keep: boolean) {
-  if (!conflictRecord.value) return
-  await resolveConflict(owner.value, conflictRecord.value.id, keep)
-  conflictRecord.value = null
-  void sync()
+  if (!conflictRecord.value) return;
+  await resolveConflict(owner.value, conflictRecord.value.id, keep);
+  conflictRecord.value = null;
+  void sync();
 }
 const date = (value: string) =>
-  new Date(value).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' })
+  new Date(value).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' });
 </script>
 <template>
   <NuxtPwaManifest />
   <div class="ambient" aria-hidden="true" />
+  <div class="marble-sculpture" aria-hidden="true" />
   <div v-if="!ready" class="loading-screen">
     <img src="/favicon.svg" alt="Gymbrain" />
     <p>Prepariamo il tuo spazio…</p>
@@ -587,7 +582,7 @@ const date = (value: string) =>
             <template v-if="view === 'oggi' || view === 'percorso'"
               ><div class="intro">
                 <div>
-                  <span class="eyebrow">MENO DISTRAZIONI. PIÙ INTENZIONE.</span>
+                  <span class="eyebrow">MENS SANA IN CORPORE SANO.</span>
                   <h1 v-if="view === 'oggi'">Ogni serie <em>conta.</em></h1>
                   <h1 v-else>Una direzione. <em>La tua.</em></h1>
                   <p>
@@ -608,6 +603,26 @@ const date = (value: string) =>
                   }}<br />Il momento giusto è adesso.
                 </div>
               </div>
+              <div v-if="view === 'percorso'" class="guided-path" aria-label="Passi della programmazione">
+                <button @click="view = 'esercizi'">
+                  <b>01</b><span>Movimenti<small>Il tuo catalogo</small></span>
+                </button>
+                <button @click="openEditor('cycle', cycle)">
+                  <b>02</b
+                  ><span
+                    >Ciclo<small>{{ cycle ? 'Personalizza' : 'Crea la direzione' }}</small></span
+                  >
+                </button>
+                <button :disabled="!cycle" @click="openEditor('plan', plan, cycle?.id)">
+                  <b>03</b
+                  ><span
+                    >Scheda<small>{{ plan ? 'Personalizza' : 'Organizza' }}</small></span
+                  >
+                </button>
+                <button :disabled="!plan" @click="openEditor('workout', workout, plan?.id)">
+                  <b>04</b><span>Giornata<small>Serie e obiettivi</small></span>
+                </button>
+              </div>
               <section v-if="!cycles.length" class="hero empty-hero">
                 <span class="eyebrow">IL TUO PRIMO PASSO</span>
                 <h2>Fai spazio<br />alla tua forza.</h2>
@@ -627,7 +642,7 @@ const date = (value: string) =>
                       v-model="cycleId"
                       @change="
                         planId = '';
-                        workoutId = ''
+                        workoutId = '';
                       "
                     >
                       <option v-for="c in cycles" :key="c.id" :value="c.id">
@@ -662,25 +677,18 @@ const date = (value: string) =>
                       </div>
                       <button v-if="view === 'oggi'" class="text-btn" @click="view = 'percorso'">
                         Esplora il percorso ↗</button
-                      ><span v-else class="subtle"
-                        >Dal {{ date((cycle!.payload as any).start) }}</span
-                      >
+                      ><span v-else class="subtle">Dal {{ date((cycle!.payload as any).start) }}</span>
                     </div>
                   </section>
                   <section class="panel weight-panel">
                     <div class="panel-title">
                       <h2>Il tuo peso</h2>
-                      <button
-                        class="icon-btn"
-                        aria-label="Registra peso"
-                        @click="openEditor('weight')"
-                      >
+                      <button class="icon-btn" aria-label="Registra peso" @click="openEditor('weight')">
                         +
                       </button>
                     </div>
                     <div class="weight">
-                      {{ latestWeight ? latestWeight.kg.toLocaleString('it-IT') : '—'
-                      }}<small>kg</small>
+                      {{ latestWeight ? latestWeight.kg.toLocaleString('it-IT') : '—' }}<small>kg</small>
                     </div>
                     <div class="subtle">Un dato. Non il tuo valore.</div>
                     <svg
@@ -723,7 +731,7 @@ const date = (value: string) =>
                           :value="plan?.id"
                           @change="
                             planId = ($event.target as HTMLSelectElement).value;
-                            workoutId = ''
+                            workoutId = '';
                           "
                         >
                           <option v-for="p in plans" :key="p.id" :value="p.id">
@@ -754,9 +762,7 @@ const date = (value: string) =>
                         :aria-pressed="w.id === workout?.id"
                         @click="workoutId = w.id"
                       >
-                        <strong
-                          >{{ String.fromCharCode(65 + i) }} ·
-                          {{ (w.payload as Workout).name }}</strong
+                        <strong>{{ String.fromCharCode(65 + i) }} · {{ (w.payload as Workout).name }}</strong
                         >{{ (w.payload as Workout).exercises.length }} esercizi
                       </button>
                     </div>
@@ -771,9 +777,7 @@ const date = (value: string) =>
                             >{{ e.exerciseType === 'weights' ? 'Pesi' : 'Corpo libero'
                             }}{{ e.variant ? ' / ' + e.variant.name : ''
                             }}{{
-                              e.assistance?.length
-                                ? ' / ' + e.assistance.map((b) => b.name).join(' + ')
-                                : ''
+                              e.assistance?.length ? ' / ' + e.assistance.map((b) => b.name).join(' + ') : ''
                             }}{{ e.band ? ' / ' + e.band : '' }}</small
                           ><small v-if="e.notes">{{ e.notes }}</small>
                         </div>
@@ -781,21 +785,25 @@ const date = (value: string) =>
                           >{{ e.sets.length }} ×
                           {{
                             e.sets
-                              .map((s) => s.reps ?? '—')
+                              .map((s) => (e.measurement === 'duration' ? s.tut : s.reps) ?? '—')
                               .filter((v, i, a) => a.indexOf(v) === i)
                               .join('/')
-                          }}</span
+                          }}
+                          {{ e.measurement === 'duration' ? 's' : 'rep' }}</span
                         >
                       </div>
                       <div class="workout-action">
                         <span class="subtle"
                           >{{ workoutData.exercises.length }} esercizi ·
-                          {{
-                            workoutData.exercises.reduce((n, e) => n + e.sets.length, 0)
-                          }}
+                          {{ workoutData.exercises.reduce((n, e) => n + e.sets.length, 0) }}
                           serie</span
                         ><button class="primary" @click="start">
-                          {{ ongoing ? 'Riprendi sessione' : 'Entra in allenamento' }}
+                          <span
+                            ><span lang="la">{{ ongoing ? 'Perge' : 'Incipe' }}</span
+                            ><small class="cta-translation">{{
+                              ongoing ? 'Riprendi sessione' : 'Entra in allenamento'
+                            }}</small></span
+                          >
                           <GIcon name="arrow" />
                         </button>
                       </div>
@@ -808,17 +816,9 @@ const date = (value: string) =>
                         @click="openEditor('workout', undefined, plan!.id)"
                       >
                         Nuova giornata +</button
-                      ><button
-                        v-if="workout"
-                        class="text-btn"
-                        @click="openEditor('workout', workout)"
-                      >
+                      ><button v-if="workout" class="text-btn" @click="openEditor('workout', workout)">
                         Modifica giornata</button
-                      ><button
-                        v-if="workout"
-                        class="text-btn danger"
-                        @click="deleteRecord = workout!"
-                      >
+                      ><button v-if="workout" class="text-btn danger" @click="deleteRecord = workout!">
                         Elimina giornata</button
                       ><button
                         v-if="plan && !workouts.length"
@@ -933,6 +933,20 @@ const date = (value: string) =>
                 </div>
                 <button class="secondary" @click="exportData">Esporta i tuoi dati ↗</button>
               </div>
+              <WhoopPanel
+                :info="whoop.info.value"
+                :records="whoop.records.value"
+                :links="whoop.links.value"
+                :sessions="sessions"
+                :loading="whoop.loading.value"
+                :message="whoop.message.value"
+                :online="online"
+                :local="local"
+                @connect="whoop.connect"
+                @sync="whoop.sync(false)"
+                @disconnect="whoop.disconnectOpen.value = true"
+                @link="whoop.link"
+              />
               <section class="panel">
                 <div class="panel-title">
                   <h2>Il tuo diario</h2>
@@ -958,8 +972,7 @@ const date = (value: string) =>
                           0,
                         )
                       }}
-                      serie · {{ (s.payload as TrainingSession).bodyWeight ?? '—' }} kg
-                      corporei</small
+                      serie · {{ (s.payload as TrainingSession).bodyWeight ?? '—' }} kg corporei</small
                     ></span
                   ><span class="text-lime">{{
                     (s.payload as TrainingSession).completedAt ? 'Dettagli ↗' : 'Riprendi →'
@@ -989,8 +1002,8 @@ const date = (value: string) =>
                 <section class="panel">
                   <h2>Salvataggio e sincronizzazione</h2>
                   <p v-if="!local && !authSession" class="notice">
-                    Accesso da rinnovare. Puoi continuare a registrare sul dispositivo e
-                    sincronizzare dopo il login.
+                    Accesso da rinnovare. Puoi continuare a registrare sul dispositivo e sincronizzare dopo il
+                    login.
                   </p>
                   <button v-if="!local && !authSession" class="primary" @click="reauth = true">
                     Rinnova accesso ?
@@ -1001,8 +1014,8 @@ const date = (value: string) =>
                     {{ conflicts.length }} conflitti
                   </p>
                   <p class="notice">
-                    Gli allenamenti vengono salvati prima sul dispositivo. Con un account, si
-                    sincronizzano all’apertura, ogni 30 secondi e al ritorno della connessione.
+                    Gli allenamenti vengono salvati prima sul dispositivo. Con un account, si sincronizzano
+                    all’apertura, ogni 30 secondi e al ritorno della connessione.
                   </p>
                   <div class="button-group">
                     <button v-if="!local" class="primary" @click="sync">
@@ -1018,8 +1031,7 @@ const date = (value: string) =>
                     {{ (c.payload as any).name || 'Pesata' }} · risolvi →
                   </button>
                   <p class="notice">
-                    Il backup JSON include schede, sessioni e dati locali. Conservalo in un luogo
-                    personale.
+                    Il backup JSON include schede, sessioni e dati locali. Conservalo in un luogo personale.
                   </p>
                   <button class="text-btn" @click="logoutOpen = true">
                     {{ local ? 'Torna all’accesso' : 'Esci da questo dispositivo' }} →
@@ -1028,18 +1040,31 @@ const date = (value: string) =>
                 <section class="panel">
                   <h2>Gymbrain sempre con te</h2>
                   <p class="subtle">
-                    Su iPhone: apri questa app in Safari, tocca Condividi → Aggiungi alla schermata
-                    Home.
+                    Su iPhone: apri questa app in Safari, tocca Condividi → Aggiungi alla schermata Home.
                   </p>
                   <p class="subtle">
                     Su Chrome: usa “Installa app” dal menu del browser, quando disponibile.
                   </p>
                   <p class="notice">
-                    Apri l’app online almeno una volta prima di allenarti senza connessione. I video
-                    allegati richiedono la rete.
+                    Apri l’app online almeno una volta prima di allenarti senza connessione. I video allegati
+                    richiedono la rete.
                   </p>
                   <button class="secondary" @click="openEditor('weight')">Registra peso +</button>
                 </section>
+                <WhoopPanel
+                  :info="whoop.info.value"
+                  :records="whoop.records.value"
+                  :links="whoop.links.value"
+                  :sessions="sessions"
+                  :loading="whoop.loading.value"
+                  :message="whoop.message.value"
+                  :online="online"
+                  :local="local"
+                  @connect="whoop.connect"
+                  @sync="whoop.sync(false)"
+                  @disconnect="whoop.disconnectOpen.value = true"
+                  @link="whoop.link"
+                />
                 <WithingsPanel
                   :info="withings.info.value"
                   :loading="withings.loading.value"
@@ -1061,16 +1086,26 @@ const date = (value: string) =>
       title="Scollega Withings"
       @close="withings.disconnectOpen.value = false"
     >
-      <p>
-        Interrompi l'importazione e revochi l'accesso a Withings. Le pesate importate restano nel
-        diario.
-      </p>
+      <p>Interrompi l'importazione e revochi l'accesso a Withings. Le pesate importate restano nel diario.</p>
       <button class="primary" :disabled="withings.loading.value" @click="withings.disconnect">
         Conferma scollegamento
       </button>
       <p v-if="withings.message.value" role="status">{{ withings.message.value }}</p>
     </AppModal>
+    <AppModal
+      :open="whoop.disconnectOpen.value"
+      title="Scollega WHOOP"
+      @close="whoop.disconnectOpen.value = false"
+    >
+      <h2>Interrompere il collegamento?</h2>
+      <p>Lo storico importato rimane nel tuo diario. L'accesso a WHOOP verr? revocato.</p>
+      <button class="primary" :disabled="whoop.loading.value" @click="whoop.disconnect">
+        Conferma scollegamento
+      </button>
+      <p role="status">{{ whoop.message.value }}</p>
+    </AppModal>
     <RecordEditor
+      :owner="owner"
       :open="editor.open"
       :kind="editor.kind"
       :record="editor.record"
@@ -1091,8 +1126,8 @@ const date = (value: string) =>
     <AppModal :open="!!deleteRecord" title="ELIMINA ELEMENTO" @close="deleteRecord = null"
       ><h2>Eliminare {{ (deleteRecord?.payload as any)?.name || 'questo elemento' }}?</h2>
       <p class="notice">
-        Le sessioni già registrate conservano esercizi e prescrizioni originali. Mesocicli e schede
-        devono essere svuotati prima di eliminarli.
+        Le sessioni già registrate conservano esercizi e prescrizioni originali. Mesocicli e schede devono
+        essere svuotati prima di eliminarli.
       </p>
       <button class="primary" @click="destroy">Conferma eliminazione</button></AppModal
     >
@@ -1112,11 +1147,7 @@ const date = (value: string) =>
         {{ local ? 'Torna all’accesso' : 'Esci e rimuovi cache' }}
       </button></AppModal
     >
-    <AppModal
-      :open="!!historyRecord"
-      title="OGNI SERIE HA UNA STORIA"
-      wide
-      @close="historyRecord = null"
+    <AppModal :open="!!historyRecord" title="OGNI SERIE HA UNA STORIA" wide @close="historyRecord = null"
       ><template v-if="historyRecord"
         ><h2>{{ (historyRecord.payload as TrainingSession).name }}</h2>
         <p class="subtle">
@@ -1141,10 +1172,12 @@ const date = (value: string) =>
           </p>
           <div v-for="(s, i) in e.actual" :key="i" class="history-set">
             <span>{{ i + 1 }}. {{ s.done ? '✓' : 'Non eseguita' }}</span
-            ><span>{{ s.reps ?? '—' }} rep</span><span>{{ s.load ?? '—' }} kg</span
-            ><span>RPE {{ s.rpe ?? '—' }}</span
+            ><span
+              >{{ (e.measurement === 'duration' ? s.tut : s.reps) ?? '—' }}
+              {{ e.measurement === 'duration' ? 's' : 'rep' }}</span
+            ><span>{{ s.load ?? '—' }} kg</span><span>RPE {{ s.rpe ?? '—' }}</span
             ><span>RIR {{ s.rir ?? '—' }}</span
-            ><span>{{ s.tut ?? '—' }} s</span>
+            ><span v-if="e.measurement !== 'duration'">{{ s.tut ?? '—' }} s TUT</span>
           </div>
           <p class="session-note">{{ e.sessionNotes }}</p>
         </section></template
@@ -1153,15 +1186,11 @@ const date = (value: string) =>
     <AppModal :open="!!videoUrl" title="IL MOVIMENTO, DA VICINO" wide @close="videoUrl = ''"
       ><video v-if="videoUrl" :src="videoUrl" controls playsinline class="video-player"
     /></AppModal>
-    <AppModal
-      :open="!!conflictRecord"
-      title="DUE MODIFICHE, UNA SCELTA"
-      wide
-      @close="conflictRecord = null"
+    <AppModal :open="!!conflictRecord" title="DUE MODIFICHE, UNA SCELTA" wide @close="conflictRecord = null"
       ><h2>Quale versione vuoi conservare?</h2>
       <p class="notice">
-        Un altro dispositivo ha modificato lo stesso elemento. Puoi esportare un backup prima di
-        scegliere. Non uniamo i dati automaticamente.
+        Un altro dispositivo ha modificato lo stesso elemento. Puoi esportare un backup prima di scegliere.
+        Non uniamo i dati automaticamente.
       </p>
       <div class="form-grid">
         <div>
@@ -1170,9 +1199,7 @@ const date = (value: string) =>
         </div>
         <div>
           <h3>Versione online</h3>
-          <pre class="conflict-data">{{
-            JSON.stringify(conflictRecord?.conflict?.payload, null, 2)
-          }}</pre>
+          <pre class="conflict-data">{{ JSON.stringify(conflictRecord?.conflict?.payload, null, 2) }}</pre>
         </div>
       </div>
       <div class="button-group">
@@ -1182,8 +1209,7 @@ const date = (value: string) =>
       </div></AppModal
     >
     <div v-if="updates.available.value" class="update-banner" role="status">
-      Nuova versione pronta. Si aggiornerà automaticamente quando avrai chiuso i moduli e
-      l’allenamento.
+      Nuova versione pronta. Si aggiornerà automaticamente quando avrai chiuso i moduli e l’allenamento.
     </div></template
   ><Transition name="toast"
     ><div v-if="toast" id="toast" popover="manual" class="show" role="status">
