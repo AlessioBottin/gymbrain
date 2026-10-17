@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+test.setTimeout(60000);
 test('Builder: personal targets, multiple days, volume, offline draft and multiple sessions', async ({
   page,
 }) => {
@@ -14,18 +15,34 @@ test('Builder: personal targets, multiple days, volume, offline draft and multip
   await editor.locator('.muscle-targets summary').click();
   await editor.getByRole('combobox', { name: 'Petto', exact: true }).selectOption('1');
   await editor.getByRole('combobox', { name: 'Tricipiti', exact: true }).selectOption('0.5');
+  await editor.getByRole('button', { name: 'Aggiungi variante +' }).click();
+  await editor.getByLabel('Nome variante', { exact: true }).fill('Deep');
   await editor.getByRole('button', { name: 'Salva sul dispositivo' }).click();
   await expect(editor).not.toBeVisible();
   await page.getByRole('button', { name: 'Percorso', exact: true }).click();
   await page.getByRole('button', { name: 'Apri builder scheda' }).click();
   const builder = page.getByRole('dialog', { name: 'BUILDER DELLA SCHEDA' });
-  await builder.getByText('Aggiungi giornate', { exact: true }).click();
-  await builder.getByRole('button', { name: '+ Lunedì', exact: true }).click();
-  await builder.getByRole('button', { name: '+ Mercoledì', exact: true }).click();
-  await builder
-    .getByRole('combobox', { name: 'Esercizio', exact: true })
-    .selectOption({ label: 'Push test' });
-  await builder.getByRole('button', { name: 'Aggiungi alle giornate selezionate' }).click();
+  for (const name of ['Lunedì', 'Mercoledì']) {
+    await builder.getByRole('button', { name: 'Aggiungi giornata', exact: true }).click();
+    await page
+      .getByRole('dialog', { name: 'AGGIUNGI GIORNATA', exact: true })
+      .getByRole('button', { name: '+ ' + name, exact: true })
+      .click();
+    await builder.getByRole('button', { name: 'Aggiungi esercizio a ' + name, exact: true }).click();
+    await page
+      .getByRole('dialog', { name: 'AGGIUNGI ESERCIZIO', exact: true })
+      .getByRole('button', { name: 'Aggiungi Push test', exact: true })
+      .click();
+    await page
+      .getByRole('dialog', { name: 'SCEGLI LA VARIANTE', exact: true })
+      .getByRole('button', { name: 'Standard', exact: true })
+      .click();
+    await page
+      .getByRole('dialog', { name: 'IMPOSTA LE SERIE', exact: true })
+      .getByRole('button', { name: 'Aggiungi alla scheda' })
+      .click();
+  }
+  await expect(builder.getByRole('button', { name: 'Salva tutte le giornate' })).toHaveCount(0);
   const layout = await builder.evaluate((el) => {
     const days = [...el.querySelectorAll('.builder-day')].map((day) => day.getBoundingClientRect());
     return {
@@ -61,8 +78,27 @@ test('Builder: personal targets, multiple days, volume, offline draft and multip
   await expect(picker.locator('.builder-picker-item')).toHaveCount(1);
   await page.screenshot({ path: 'preview-artifacts/builder-exercise-picker.png' });
   await picker.getByRole('button', { name: 'Aggiungi Push test', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'SCEGLI LA VARIANTE', exact: true })
+    .getByRole('button', { name: 'Deep', exact: true })
+    .click();
+  const settings = page.getByRole('dialog', { name: 'IMPOSTA LE SERIE', exact: true });
+  await expect(settings).toBeVisible();
+  await settings.getByRole('button', { name: 'Aggiungi alla scheda' }).click();
   await expect(picker).not.toBeVisible();
   await expect(addToUpper).toBeFocused();
+  const card = builder
+    .locator('.builder-day')
+    .first()
+    .locator('.builder-exercise')
+    .filter({ hasText: 'Push test' });
+  await expect(card).toContainText('Deep');
+  await card.getByRole('button', { name: 'Modifica serie di Push test' }).click();
+  await settings.getByLabel('Numero di serie').fill('3');
+  await settings.getByLabel('Numero di serie').press('Tab');
+  await settings.getByRole('button', { name: 'Annulla', exact: true }).click();
+  await expect(card.locator('.builder-prescription')).toContainText('1');
+
   await expect(
     builder
       .locator('.builder-day')
@@ -87,7 +123,7 @@ test('Builder: personal targets, multiple days, volume, offline draft and multip
   expect(await builder.locator('.builder-board').evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(
     true,
   );
-  await builder.getByRole('button', { name: 'Salva tutte le giornate' }).click();
+  await builder.getByRole('button', { name: 'Chiudi', exact: true }).click();
   await expect(builder).not.toBeVisible();
   await page.getByLabel('Lunedì', { exact: true }).check();
   await page.getByLabel('Mercoledì', { exact: true }).check();
@@ -120,21 +156,33 @@ test('Desktop overview and a cluster inside a superset guide execution and prese
   expect(bounds[2]!.left).toBeGreaterThan(bounds[0]!.left);
   await expect(builder.getByRole('heading', { name: 'Recap scheda' })).toBeVisible();
   await page.screenshot({ path: 'preview-artifacts/builder-desktop.png' });
+  await builder.getByRole('button', { name: 'Aggiungi esercizio a Upper body', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'AGGIUNGI ESERCIZIO', exact: true })
+    .getByRole('button', { name: 'Aggiungi Squat', exact: true })
+    .click();
+  const newSettings = page.getByRole('dialog', { name: 'IMPOSTA LE SERIE', exact: true });
+  await expect(newSettings).toBeVisible();
+  await expect(newSettings.getByLabel('Variante', { exact: true })).toHaveCount(0);
+  await newSettings.getByRole('button', { name: 'Annulla', exact: true }).click();
   const firstDay = builder.locator('.builder-day').first();
   const a = firstDay.locator('.builder-exercise').nth(0),
     b = firstDay.locator('.builder-exercise').nth(1);
-  await a.getByLabel('Numero di serie').fill('1');
-  await a.getByLabel('Numero di serie').press('Tab');
-  await b.getByLabel('Numero di serie').fill('1');
-  await b.getByLabel('Numero di serie').press('Tab');
-  await a.getByText('Modifica esercizio e serie', { exact: true }).click();
-  await a.getByLabel('Gruppo di esecuzione').selectOption('superset');
-  const group = await a.getByLabel('Gruppo di esecuzione').inputValue();
-  await b.getByText('Modifica esercizio e serie', { exact: true }).click();
-  await b.getByLabel('Gruppo di esecuzione').selectOption(group);
-  await a.getByLabel('Tecnica serie').selectOption('cluster');
+  const settings = page.getByRole('dialog', { name: 'IMPOSTA LE SERIE', exact: true });
+  await a.getByRole('button', { name: /Modifica serie/ }).click();
+  await settings.getByLabel('Numero di serie').fill('1');
+  await settings.getByLabel('Numero di serie').press('Tab');
+  await settings.getByLabel('Gruppo di esecuzione').selectOption('superset');
+  const group = await settings.getByLabel('Gruppo di esecuzione').inputValue();
+  await settings.getByLabel('Tecnica serie').selectOption('cluster');
+  await settings.getByRole('button', { name: 'Conferma modifiche' }).click();
+  await b.getByRole('button', { name: /Modifica serie/ }).click();
+  await settings.getByLabel('Numero di serie').fill('1');
+  await settings.getByLabel('Numero di serie').press('Tab');
+  await settings.getByLabel('Gruppo di esecuzione').selectOption(group);
+  await settings.getByRole('button', { name: 'Conferma modifiche' }).click();
   await expect(a.locator('.builder-prescription')).toContainText('1 × 6+6');
-  await builder.getByRole('button', { name: 'Salva tutte le giornate' }).click();
+  await builder.getByRole('button', { name: 'Chiudi', exact: true }).click();
   await expect(builder).not.toBeVisible();
   await page.getByRole('button', { name: 'Entra in allenamento' }).click();
   const session = page.getByRole('dialog', { name: 'FOCUS MODE · IL TUO ALLENAMENTO', exact: true });

@@ -85,11 +85,22 @@ test('Builder commits all days and outbox entries atomically, rolls back on stal
   );
   assert.equal(await db.records.get([owner, fresh]), undefined);
   assert.equal(await db.queue.count(), before);
-  await savePlanWorkouts(owner, plan.id, [
+  const saved = await savePlanWorkouts(owner, plan.id, [
     { id: fresh, payload },
     { id: day.id, revision: day.localRevision, payload },
   ]);
   assert.equal(await db.queue.count(), before + 2);
+  const next = await savePlanWorkouts(
+    owner,
+    plan.id,
+    saved.map((row) => ({
+      id: row.id,
+      revision: row.localRevision,
+      payload: { ...payload, notes: 'Autosaved again' },
+    })),
+  );
+  assert.equal(next[0]!.localRevision, saved[0]!.localRevision + 1);
+  assert.equal((await db.records.get([owner, fresh]))!.payload.notes, 'Autosaved again');
   const session = snapshotSession(day, null);
   assert.equal(session.exercises[0]!.muscleTargets?.chest, 1);
 });

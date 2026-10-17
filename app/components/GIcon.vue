@@ -1,5 +1,5 @@
 <script setup lang="ts">
-defineProps<{ name: string; size?: number }>()
+defineProps<{ name: string; size?: number }>();
 const paths: Record<string, string> = {
   grid: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z',
   layers: 'm12 3 10 5-10 5L2 8l10-5Zm-10 9 10 5 10-5M2 16l10 5 10-5',
@@ -7,6 +7,7 @@ const paths: Record<string, string> = {
   chart: 'M3 3v18h18M6 15l5-5 4 3 6-8',
   arrow: 'M4 12h16m-6-6 6 6-6 6',
   plus: 'M12 5v14M5 12h14',
+  edit: 'm16 3 5 5M3 21l5-1L21 7a2 2 0 0 0-5-5L3 15v6Z',
   check: 'm5 12 4 4L19 6',
   close: 'm6 6 12 12M6 18 18 6',
   chevron: 'm9 5 7 7-7 7',
@@ -22,7 +23,7 @@ const paths: Record<string, string> = {
   bolt: 'm13 2-9 12h7l-1 8 10-13h-7l0-7',
   info: 'M12 11v6M12 7h.01M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',
   menu: 'M4 6h16M4 12h16M4 18h16',
-}
+};
 </script>
 <template>
   <svg

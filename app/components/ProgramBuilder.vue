@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   workoutSchema,
+  prescriptionSchema,
   newTarget,
   type LocalRecord,
   type Workout,
@@ -19,28 +20,81 @@ const props = defineProps<{
 const emit = defineEmits<{ close: []; saved: [] }>();
 type Day = { id: string; revision?: number; payload: Workout };
 const days = ref<Day[]>([]),
-  selectedDays = ref<string[]>([]),
-  selectedExercise = ref(''),
   saving = ref(false),
   error = ref('');
 const pickerDayId = ref(''),
   pickerSearch = ref('');
+const flowStage = ref<'exercise' | 'variant' | 'sets'>('exercise');
+const candidateRow = ref<LocalRecord>();
+const editExercises = ref<Prescription[]>([]),
+  editIndex = ref(0),
+  editingExisting = ref(false);
+const settingsError = ref('');
+const dayMenuOpen = ref(false);
 const pickerDay = computed(() => days.value.find((day) => day.id === pickerDayId.value));
+const editExercise = computed(() => editExercises.value[editIndex.value]);
 const pickerExercises = computed(() => {
   const query = pickerSearch.value.trim().toLocaleLowerCase('it-IT');
   return props.catalog.filter((row) =>
     (row.payload as Exercise).name.toLocaleLowerCase('it-IT').includes(query),
   );
 });
+const candidateVariants = computed(
+  () => (candidateRow.value?.payload as Exercise | undefined)?.variants || [],
+);
+const flowTitle = computed(() =>
+  flowStage.value === 'exercise'
+    ? 'AGGIUNGI ESERCIZIO'
+    : flowStage.value === 'variant'
+      ? 'SCEGLI LA VARIANTE'
+      : 'IMPOSTA LE SERIE',
+);
 function openExercisePicker(day: Day) {
   pickerSearch.value = '';
+  candidateRow.value = undefined;
+  flowStage.value = 'exercise';
+  editingExisting.value = false;
+  settingsError.value = '';
   pickerDayId.value = day.id;
 }
 function addToPickerDay(row: LocalRecord) {
-  const day = pickerDay.value;
-  if (!day || day.payload.exercises.length >= 50) return;
-  day.payload.exercises.push(makePrescription(row));
-  pickerDayId.value = '';
+  if (!pickerDay.value) return;
+  candidateRow.value = row;
+  if ((row.payload as Exercise).variants?.length) flowStage.value = 'variant';
+  else prepareNewExercise();
+}
+function prepareNewExercise(variantId = '') {
+  if (!pickerDay.value || !candidateRow.value) return;
+  const exercise = makePrescription(candidateRow.value);
+  const variant = candidateVariants.value.find((v) => v.id === variantId);
+  exercise.variant = variant ? JSON.parse(JSON.stringify(variant)) : null;
+  editExercises.value = JSON.parse(JSON.stringify(pickerDay.value.payload.exercises));
+  editIndex.value = editExercises.value.length;
+  editExercises.value.push(exercise);
+  editingExisting.value = false;
+  settingsError.value = '';
+  flowStage.value = 'sets';
+}
+function openSetEditor(day: Day, index: number) {
+  editingExisting.value = true;
+  candidateRow.value = undefined;
+  editExercises.value = JSON.parse(JSON.stringify(day.payload.exercises));
+  editIndex.value = index;
+  settingsError.value = '';
+  flowStage.value = 'sets';
+  pickerDayId.value = day.id;
+}
+function applyExerciseSettings() {
+  try {
+    if (!pickerDay.value || !editExercise.value) return;
+    const valid = editExercises.value.map((e) => prescriptionSchema.parse(e));
+    if (!editingExisting.value && pickerDay.value.payload.exercises.length >= 50)
+      throw new Error('Una giornata ha raggiunto il limite di 50 esercizi.');
+    pickerDay.value.payload.exercises = valid;
+    pickerDayId.value = '';
+  } catch (e) {
+    settingsError.value = e instanceof Error ? e.message : 'Controlla i valori delle serie.';
+  }
 }
 const weekdays = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 const key = computed(() => `gymbrain-draft:${props.owner}:builder:${props.plan.id}`);
@@ -51,13 +105,13 @@ watch(
     pickerDayId.value = '';
     if (!value) return;
     error.value = '';
-    selectedDays.value = [];
-    selectedExercise.value = '';
     days.value = props.workouts.map((r) => ({
       id: r.id,
       revision: r.localRevision,
       payload: workoutSchema.parse(JSON.parse(JSON.stringify(r.payload))),
     }));
+    savedContent.value = content.value;
+    dayMenuOpen.value = false;
     try {
       const saved = JSON.parse(localStorage.getItem(key.value) || 'null');
       if (Array.isArray(saved)) days.value = saved;
@@ -66,25 +120,48 @@ watch(
     }
   },
 );
-watch(
-  days,
-  () => {
-    if (!props.open) return;
-    try {
-      localStorage.setItem(key.value, JSON.stringify(days.value));
-    } catch {
-      error.value = 'Spazio locale non disponibile: salva prima di chiudere.';
-    }
-  },
-  { deep: true },
+const content = computed(() => JSON.stringify(days.value.map(({ id, payload }) => ({ id, payload }))));
+const savedContent = ref('');
+let saveTimer: ReturnType<typeof setTimeout> | undefined;
+let pendingSave: Promise<boolean> | undefined;
+const saveStatus = computed(() =>
+  saving.value
+    ? 'Salvataggio automatico…'
+    : error.value
+      ? 'Modifiche da completare'
+      : content.value !== savedContent.value
+        ? 'Modifiche in attesa…'
+        : 'Salvato sul dispositivo',
 );
+function persistDraft() {
+  try {
+    localStorage.setItem(key.value, JSON.stringify(days.value));
+  } catch {
+    error.value = 'Spazio locale non disponibile.';
+  }
+}
+watch(content, () => {
+  if (!props.open) return;
+  persistDraft();
+  clearTimeout(saveTimer);
+  if (content.value !== savedContent.value)
+    saveTimer = setTimeout(() => {
+      void save();
+    }, 600);
+});
+onBeforeUnmount(() => clearTimeout(saveTimer));
+async function closeBuilder() {
+  clearTimeout(saveTimer);
+  if (pendingSave) await pendingSave;
+  if (await save()) emit('close');
+}
 function resetDraft() {
   days.value = props.workouts.map((r) => ({
     id: r.id,
     revision: r.localRevision,
     payload: workoutSchema.parse(JSON.parse(JSON.stringify(r.payload))),
   }));
-  selectedDays.value = [];
+  savedContent.value = content.value;
   error.value = '';
 }
 function addDay(name: string) {
@@ -93,14 +170,7 @@ function addDay(name: string) {
     payload: { name, notes: '', order: days.value.length, exercises: [] },
   };
   days.value.push(day);
-  selectedDays.value.push(day.id);
-}
-function addExercise() {
-  const row = props.catalog.find((r) => r.id === selectedExercise.value);
-  if (!row) return;
-  for (const day of days.value.filter((d) => selectedDays.value.includes(d.id))) {
-    if (day.payload.exercises.length < 50) day.payload.exercises.push(makePrescription(row));
-  }
+  dayMenuOpen.value = false;
 }
 function variants(e: Prescription) {
   return (props.catalog.find((r) => r.id === e.exerciseId)?.payload as Exercise | undefined)?.variants || [];
@@ -145,79 +215,63 @@ function techniqueSummary(e: Prescription) {
   if (e.group) labels.unshift(e.group.type === 'jump' ? 'Jump set' : 'Superset');
   return labels.join(' · ');
 }
-async function save() {
+async function save(): Promise<boolean> {
+  if (pendingSave) return pendingSave;
+  if (content.value === savedContent.value) return true;
+  const snapshot = JSON.parse(JSON.stringify(days.value)) as Day[];
+  const snapshotContent = content.value;
   saving.value = true;
   error.value = '';
-  try {
-    await savePlanWorkouts(props.owner, props.plan.id, days.value);
-    localStorage.removeItem(key.value);
-    emit('saved');
-    emit('close');
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Salvataggio non riuscito';
-  } finally {
-    saving.value = false;
-  }
+  pendingSave = (async () => {
+    try {
+      const rows = await savePlanWorkouts(props.owner, props.plan.id, snapshot);
+      for (const row of rows) {
+        const day = days.value.find((d) => d.id === row.id);
+        if (day) day.revision = row.localRevision;
+      }
+      savedContent.value = snapshotContent;
+      persistDraft();
+      if (content.value === savedContent.value) localStorage.removeItem(key.value);
+      emit('saved');
+      return true;
+    } catch (e) {
+      error.value =
+        e instanceof Error
+          ? 'issues' in e
+            ? 'Completa i dati delle giornate: ogni gruppo deve contenere almeno due esercizi e valori validi.'
+            : e.message
+          : 'Salvataggio non riuscito';
+      return false;
+    } finally {
+      saving.value = false;
+      pendingSave = undefined;
+      if (!error.value && content.value !== savedContent.value) {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => {
+          void save();
+        }, 600);
+      }
+    }
+  })();
+  return pendingSave;
 }
 </script>
 <template>
-  <AppModal :open="open" title="BUILDER DELLA SCHEDA" wide @close="!saving && emit('close')">
-    <form v-if="open" class="program-builder" @submit.prevent="save">
+  <AppModal :open="open" title="BUILDER DELLA SCHEDA" wide @close="closeBuilder">
+    <form v-if="open" class="program-builder" @submit.prevent>
       <header class="builder-toolbar">
         <div>
           <h2>{{ (plan.payload as any).name }}</h2>
           <p class="draft-status">
             {{ (plan.payload as any).start || 'Periodo da impostare'
-            }}<template v-if="(plan.payload as any).end"> → {{ (plan.payload as any).end }}</template> · Bozza
-            salvata sul dispositivo
+            }}<template v-if="(plan.payload as any).end"> → {{ (plan.payload as any).end }}</template>
           </p>
         </div>
-        <button type="submit" class="primary" :disabled="saving || !days.length">
-          {{ saving ? 'Salvataggio…' : 'Salva tutte le giornate' }}
+        <button type="button" class="primary" @click="dayMenuOpen = true">
+          <GIcon name="plus" /> Aggiungi giornata
         </button>
       </header>
-      <details class="builder-add-days" :open="!days.length">
-        <summary>Aggiungi giornate</summary>
-        <div class="button-group">
-          <button
-            v-for="day in weekdays"
-            :key="day"
-            type="button"
-            class="secondary"
-            :disabled="days.some((d) => d.payload.name === day)"
-            @click="addDay(day)"
-          >
-            + {{ day }}
-          </button>
-          <button type="button" class="text-btn" @click="addDay('Giornata ' + (days.length + 1))">
-            + Giornata personalizzata
-          </button>
-        </div>
-      </details>
-      <div class="builder-add">
-        <label
-          >Esercizio<select v-model="selectedExercise">
-            <option value="">Scegli dal catalogo</option>
-            <option v-for="e in catalog" :key="e.id" :value="e.id">{{ (e.payload as Exercise).name }}</option>
-          </select></label
-        >
-        <fieldset>
-          <legend>Aggiungi nelle giornate</legend>
-          <div class="builder-destinations">
-            <label v-for="day in days" :key="day.id" class="builder-check"
-              ><input v-model="selectedDays" type="checkbox" :value="day.id" />{{ day.payload.name }}</label
-            >
-          </div>
-        </fieldset>
-        <button
-          type="button"
-          class="secondary"
-          :disabled="!selectedExercise || !selectedDays.length"
-          @click="addExercise"
-        >
-          Aggiungi alle giornate selezionate
-        </button>
-      </div>
+      <p role="status" class="draft-status">{{ saveStatus }}</p>
       <p v-if="!catalog.length">Crea i tuoi esercizi nel catalogo per aggiungerli qui.</p>
       <div class="builder-layout">
         <div class="builder-board" role="region" aria-label="Giornate della scheda affiancate" tabindex="0">
@@ -232,7 +286,7 @@ async function save() {
                   class="icon-btn builder-day-add"
                   :aria-label="`Aggiungi esercizio a ${day.payload.name}`"
                   title="Aggiungi esercizio"
-                  :disabled="saving || day.payload.exercises.length >= 50"
+                  :disabled="day.payload.exercises.length >= 50"
                   @click="openExercisePicker(day)"
                 >
                   <GIcon name="plus" :size="22" />
@@ -254,30 +308,17 @@ async function save() {
                   <strong>{{ e.sets.length }} × {{ repsSummary(e) }}</strong>
                   {{ e.measurement === 'duration' ? 's' : 'rep' }}
                 </p>
-                <label class="builder-count"
-                  >Numero di serie<input
-                    type="number"
-                    :value="e.sets.length"
-                    min="1"
-                    max="30"
-                    required
-                    @change="setCount(e, $event)"
-                /></label>
+                <button
+                  type="button"
+                  class="icon-btn builder-edit"
+                  :aria-label="`Modifica serie di ${e.name}`"
+                  title="Modifica serie"
+                  @click="openSetEditor(day, i)"
+                >
+                  <GIcon name="edit" :size="18" />
+                </button>
                 <details class="builder-exercise-details">
-                  <summary>Modifica esercizio e serie</summary>
-                  <ExerciseGroup :exercise="e" :exercises="day.payload.exercises" />
-                  <label
-                    >Variante<select :value="e.variant?.id || ''" @change="chooseVariant(e, $event)">
-                      <option value="">Standard</option>
-                      <option
-                        v-if="e.variant && !variants(e).some((v) => v.id === e.variant?.id)"
-                        :value="e.variant.id"
-                      >
-                        {{ e.variant.name }} (salvata)
-                      </option>
-                      <option v-for="v in variants(e)" :key="v.id" :value="v.id">{{ v.name }}</option>
-                    </select></label
-                  >
+                  <summary>Organizza esercizio</summary>
                   <label
                     >Sposta in<select value="" @change="moveExercise(day, i, $event)">
                       <option value="">Scegli giornata</option>
@@ -317,33 +358,6 @@ async function save() {
                       Sposta sotto
                     </button>
                   </div>
-                  <div v-for="(set, index) in e.sets" :key="index" class="builder-set">
-                    <label class="builder-check"
-                      ><input
-                        type="checkbox"
-                        :checked="set.countVolume !== false"
-                        @change="set.countVolume = ($event.target as HTMLInputElement).checked"
-                      />Serie {{ index + 1 }} · volume</label
-                    >
-                    <label v-if="!set.segments?.length"
-                      >{{ e.measurement === 'duration' ? 'Secondi' : 'Ripetizioni'
-                      }}<StableNumberInput
-                        :value="e.measurement === 'duration' ? set.tut : set.reps"
-                        :min="1"
-                        :max="2000"
-                        :step="1"
-                        @commit="e.measurement === 'duration' ? (set.tut = $event) : (set.reps = $event)"
-                    /></label>
-                    <label v-if="!set.segments?.length"
-                      >Kg<StableNumberInput
-                        :value="set.load"
-                        :min="0"
-                        :max="2000"
-                        :step="0.5"
-                        @commit="set.load = $event"
-                    /></label>
-                    <SetTechnique :set="set" :measurement="e.measurement" />
-                  </div>
                   <button type="button" class="text-btn danger" @click="day.payload.exercises.splice(i, 1)">
                     Rimuovi esercizio
                   </button>
@@ -365,46 +379,195 @@ async function save() {
         </section>
       </div>
       <p v-if="error" role="alert">{{ error }}</p>
-      <button type="button" class="text-btn" @click="resetDraft">Riparti dalle giornate salvate</button>
+      <button type="button" class="text-btn" :disabled="saving" @click="resetDraft">
+        Riparti dalle giornate salvate
+      </button>
     </form>
   </AppModal>
-  <AppModal :open="open && !!pickerDay" title="AGGIUNGI ESERCIZIO" @close="pickerDayId = ''">
+  <AppModal :open="open && dayMenuOpen" title="AGGIUNGI GIORNATA" @close="dayMenuOpen = false">
+    <div class="button-group">
+      <button
+        v-for="day in weekdays"
+        :key="day"
+        type="button"
+        class="secondary"
+        :disabled="days.some((d) => d.payload.name === day)"
+        @click="addDay(day)"
+      >
+        + {{ day }}
+      </button>
+      <button type="button" class="secondary" @click="addDay('Giornata ' + (days.length + 1))">
+        + Giornata personalizzata
+      </button>
+    </div>
+  </AppModal>
+  <AppModal :open="open && !!pickerDay" :title="flowTitle" @close="pickerDayId = ''">
     <div v-if="pickerDay" class="builder-picker">
       <h2>{{ pickerDay.payload.name }}</h2>
-      <label
-        >Cerca esercizio<input
-          v-model="pickerSearch"
-          type="search"
-          placeholder="Nome dell'esercizio"
-          autofocus
-      /></label>
-      <p class="notice">Scegli un esercizio per aggiungerlo a questa giornata.</p>
-      <p v-if="!catalog.length" role="status">
-        Il catalogo è vuoto. Crea prima i tuoi esercizi nella sezione Esercizi.
-      </p>
-      <p v-else-if="!pickerExercises.length" role="status">Nessun esercizio trovato.</p>
-      <div class="builder-picker-list">
-        <button
-          v-for="row in pickerExercises"
-          :key="row.id"
-          type="button"
-          class="builder-picker-item"
-          :aria-label="`Aggiungi ${(row.payload as Exercise).name}`"
-          :disabled="pickerDay.payload.exercises.length >= 50"
-          @click="addToPickerDay(row)"
+      <template v-if="flowStage === 'exercise'">
+        <label
+          >Cerca esercizio<input
+            v-model="pickerSearch"
+            type="search"
+            placeholder="Nome dell'esercizio"
+            autofocus
+        /></label>
+        <p class="notice">Scegli un esercizio per aggiungerlo a questa giornata.</p>
+        <p v-if="!catalog.length" role="status">
+          Il catalogo è vuoto. Crea prima i tuoi esercizi nella sezione Esercizi.
+        </p>
+        <p v-else-if="!pickerExercises.length" role="status">Nessun esercizio trovato.</p>
+        <div class="builder-picker-list">
+          <button
+            v-for="row in pickerExercises"
+            :key="row.id"
+            type="button"
+            class="builder-picker-item"
+            :aria-label="`Aggiungi ${(row.payload as Exercise).name}`"
+            :disabled="pickerDay.payload.exercises.length >= 50"
+            @click="addToPickerDay(row)"
+          >
+            <span
+              ><strong>{{ (row.payload as Exercise).name }}</strong
+              ><small>{{
+                (row.payload as Exercise).exerciseType === 'weights' ? 'Pesi' : 'Corpo libero'
+              }}</small></span
+            ><GIcon name="plus" />
+          </button>
+        </div>
+      </template>
+      <template v-else-if="flowStage === 'variant'">
+        <h3>{{ (candidateRow?.payload as Exercise)?.name }}</h3>
+        <p class="notice">Scegli la variante o usa l'esercizio standard.</p>
+        <div class="builder-picker-list">
+          <button type="button" class="builder-picker-item" @click="prepareNewExercise()">
+            <strong>Standard</strong>
+          </button>
+          <button
+            v-for="variant in candidateVariants"
+            :key="variant.id"
+            type="button"
+            class="builder-picker-item"
+            @click="prepareNewExercise(variant.id)"
+          >
+            <span
+              ><strong>{{ variant.name }}</strong
+              ><small v-if="variant.notes">{{ variant.notes }}</small></span
+            ><GIcon name="arrow" />
+          </button>
+        </div>
+        <button type="button" class="text-btn" @click="flowStage = 'exercise'">Cambia esercizio</button>
+      </template>
+      <form v-else-if="editExercise" @submit.prevent="applyExerciseSettings" class="builder-set-form">
+        <h3>
+          {{ editExercise.name }}<span v-if="editExercise.variant"> · {{ editExercise.variant.name }}</span>
+        </h3>
+        <label v-if="variants(editExercise).length || editExercise.variant"
+          >Variante<select
+            :value="editExercise.variant?.id || ''"
+            @change="chooseVariant(editExercise, $event)"
+          >
+            <option value="">Standard</option>
+            <option
+              v-if="
+                editExercise.variant &&
+                !variants(editExercise).some((v) => v.id === editExercise?.variant?.id)
+              "
+              :value="editExercise.variant.id"
+            >
+              {{ editExercise.variant.name }} (salvata)
+            </option>
+            <option v-for="v in variants(editExercise)" :key="v.id" :value="v.id">{{ v.name }}</option>
+          </select></label
         >
-          <span
-            ><strong>{{ (row.payload as Exercise).name }}</strong
-            ><small>{{
-              (row.payload as Exercise).exerciseType === 'weights' ? 'Pesi' : 'Corpo libero'
-            }}</small></span
-          ><GIcon name="plus" />
-        </button>
-      </div>
+        <label
+          >Numero di serie<input
+            type="number"
+            :value="editExercise.sets.length"
+            min="1"
+            max="30"
+            required
+            @change="setCount(editExercise, $event)"
+        /></label>
+        <ExerciseGroup :exercise="editExercise" :exercises="editExercises" />
+        <label>Note esercizio<textarea v-model="editExercise.notes" maxlength="4000" rows="2" /></label>
+        <AssistancePicker
+          v-if="editExercise.exerciseType === 'bodyweight'"
+          v-model="editExercise.assistance"
+        />
+        <fieldset v-for="(set, index) in editExercise.sets" :key="index" class="builder-set">
+          <legend>Serie {{ index + 1 }}</legend>
+          <label class="builder-check"
+            ><input
+              type="checkbox"
+              :checked="set.countVolume !== false"
+              @change="set.countVolume = ($event.target as HTMLInputElement).checked"
+            />Includi nel volume</label
+          >
+          <div class="form-grid">
+            <label v-if="!set.segments?.length"
+              >{{ editExercise.measurement === 'duration' ? 'Secondi' : 'Ripetizioni'
+              }}<StableNumberInput
+                :value="editExercise.measurement === 'duration' ? set.tut : set.reps"
+                :min="1"
+                :max="2000"
+                :step="1"
+                @commit="editExercise.measurement === 'duration' ? (set.tut = $event) : (set.reps = $event)"
+            /></label>
+            <label v-if="!set.segments?.length"
+              >{{ editExercise.exerciseType === 'weights' ? 'Carico (kg)' : 'Sovraccarico (kg)'
+              }}<StableNumberInput
+                :value="set.load"
+                :min="0"
+                :max="2000"
+                :step="0.5"
+                @commit="set.load = $event"
+            /></label>
+            <label
+              >RPE<StableNumberInput
+                :value="set.rpe"
+                :min="1"
+                :max="10"
+                :step="0.5"
+                @commit="set.rpe = $event"
+            /></label>
+            <label
+              >RIR<StableNumberInput :value="set.rir" :min="0" :max="10" :step="1" @commit="set.rir = $event"
+            /></label>
+          </div>
+          <SetTechnique :set="set" :measurement="editExercise.measurement" />
+        </fieldset>
+        <p v-if="settingsError" role="alert">{{ settingsError }}</p>
+        <div class="button-group">
+          <button type="button" class="secondary" @click="pickerDayId = ''">Annulla</button
+          ><button type="submit" class="primary">
+            {{ editingExisting ? 'Conferma modifiche' : 'Aggiungi alla scheda' }}
+          </button>
+        </div>
+      </form>
     </div>
   </AppModal>
 </template>
 <style scoped>
+.builder-edit {
+  float: right;
+  margin-top: -36px;
+  color: var(--lime);
+  border: 1px solid var(--line);
+}
+.builder-prescription {
+  padding-right: 44px;
+}
+.builder-set-form .builder-check input {
+  width: auto;
+}
+.builder-set-form .builder-set {
+  padding: 12px;
+  margin: 16px 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
 .builder-day-heading {
   display: flex;
   align-items: end;
@@ -471,30 +634,6 @@ async function save() {
 .builder-toolbar h2 {
   margin: 0;
 }
-.builder-add-days {
-  margin: 12px 0;
-}
-.builder-add {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: end;
-  padding: 12px 0;
-}
-.builder-add > label {
-  min-width: 190px;
-  flex: 1;
-}
-.builder-add fieldset {
-  flex: 3;
-  min-width: 0;
-  margin: 0;
-}
-.builder-destinations {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 14px;
-}
 .builder-layout {
   display: block;
   min-width: 0;
@@ -554,26 +693,11 @@ async function save() {
   font-size: 14px;
   margin: 8px 0;
 }
-.builder-count {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 12px;
-}
-.builder-count input {
-  width: 64px;
-  padding: 6px;
-}
 .builder-exercise-details {
   margin-top: 10px;
   font-size: 12px;
 }
 .builder-exercise-details summary,
-.builder-add-days summary,
-.builder-day-notes summary {
-  cursor: pointer;
-}
 .builder-set {
   border-bottom: 1px solid #8b949755;
   padding: 10px 0;
@@ -620,12 +744,6 @@ async function save() {
     align-items: stretch;
     flex-direction: column;
   }
-  .builder-add {
-    display: block;
-  }
-  .builder-add > * {
-    margin-bottom: 10px;
-  }
 }
 .program-builder label {
   margin-top: 5px;
@@ -638,12 +756,6 @@ async function save() {
 .builder-toolbar .draft-status {
   margin: 4px 0;
 }
-.builder-count {
-  margin: 4px 0;
-}
-.builder-count input {
-  margin-top: 0 !important;
-}
 .builder-exercise {
   padding: 9px 0;
 }
@@ -652,9 +764,6 @@ async function save() {
 }
 .builder-day-name {
   margin-top: 0 !important;
-}
-.builder-add {
-  padding: 4px 0;
 }
 .builder-recap h3 {
   margin: 0;

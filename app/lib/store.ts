@@ -275,15 +275,19 @@ export async function savePlanWorkouts(
     const plan = await db.records.get([owner, planId]);
     if (!plan || plan.deleted || plan.kind !== 'plan' || plan.conflict)
       throw new Error('Scheda non disponibile o in conflitto.');
+    const saved: LocalRecord[] = [];
     for (const day of days) {
       const previous = await db.records.get([owner, day.id]);
       if (previous && (previous.deleted || previous.parent_id !== planId || day.revision === undefined))
         throw new Error('Giornata modificata: riapri il builder.');
-      await saveRecord(owner, 'workout', day.payload, {
-        id: day.id,
-        parentId: planId,
-        expectedRevision: day.revision,
-      });
+      saved.push(
+        await saveRecord(owner, 'workout', day.payload, {
+          id: day.id,
+          parentId: planId,
+          expectedRevision: day.revision,
+        }),
+      );
     }
+    return saved;
   });
 }
