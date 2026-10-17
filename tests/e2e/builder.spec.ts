@@ -26,6 +26,18 @@ test('Builder: personal targets, multiple days, volume, offline draft and multip
     .getByRole('combobox', { name: 'Esercizio', exact: true })
     .selectOption({ label: 'Push test' });
   await builder.getByRole('button', { name: 'Aggiungi alle giornate selezionate' }).click();
+  const layout = await builder.evaluate((el) => {
+    const days = [...el.querySelectorAll('.builder-day')].map((day) => day.getBoundingClientRect());
+    return {
+      tops: days.map((d) => d.top),
+      lefts: days.map((d) => d.left),
+      bottom: Math.max(...days.map((d) => d.bottom)),
+      recapTop: el.querySelector('.builder-recap')!.getBoundingClientRect().top,
+    };
+  });
+  expect(new Set(layout.tops).size).toBe(1);
+  expect(layout.lefts.every((left, i, all) => i === 0 || left > all[i - 1]!)).toBe(true);
+  expect(layout.recapTop).toBeGreaterThan(layout.bottom);
   const total = builder.locator('.volume-summary').first();
   await expect(
     total
@@ -44,6 +56,9 @@ test('Builder: personal targets, multiple days, volume, offline draft and multip
   await expect(builder.getByRole('heading', { name: /Push test/ })).toHaveCount(2);
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await builder.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+  expect(await builder.locator('.builder-board').evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(
+    true,
+  );
   await builder.getByRole('button', { name: 'Salva tutte le giornate' }).click();
   await expect(builder).not.toBeVisible();
   await page.getByLabel('Lunedì', { exact: true }).check();

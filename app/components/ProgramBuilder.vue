@@ -200,135 +200,137 @@ async function save() {
       </div>
       <p v-if="!catalog.length">Crea i tuoi esercizi nel catalogo per aggiungerli qui.</p>
       <div class="builder-layout">
-        <div class="builder-days">
-          <section v-for="day in days" :key="day.id" class="builder-day">
-            <label class="builder-day-name"
-              >Giornata<input v-model="day.payload.name" maxlength="100" required
-            /></label>
-            <p class="builder-day-meta">
-              {{ day.payload.exercises.length }} esercizi ·
-              {{ day.payload.exercises.reduce((n, e) => n + e.sets.length, 0) }} serie
-            </p>
-            <details class="builder-day-notes">
-              <summary>Note giornata</summary>
-              <textarea v-model="day.payload.notes" aria-label="Note giornata" maxlength="4000" rows="2" />
-            </details>
-            <article v-for="(e, i) in day.payload.exercises" :key="e.id" class="builder-exercise">
-              <h3>{{ i + 1 }}. {{ e.name }}</h3>
-              <p v-if="e.variant" class="builder-variant">{{ e.variant.name }}</p>
-              <span class="builder-technique">{{ techniqueSummary(e) }}</span>
-              <p class="builder-prescription">
-                <strong>{{ e.sets.length }} × {{ repsSummary(e) }}</strong>
-                {{ e.measurement === 'duration' ? 's' : 'rep' }}
-              </p>
-              <label class="builder-count"
-                >Numero di serie<input
-                  type="number"
-                  :value="e.sets.length"
-                  min="1"
-                  max="30"
-                  required
-                  @change="setCount(e, $event)"
+        <div class="builder-board" role="region" aria-label="Giornate della scheda affiancate" tabindex="0">
+          <div class="builder-days">
+            <section v-for="day in days" :key="day.id" class="builder-day">
+              <label class="builder-day-name"
+                >Giornata<input v-model="day.payload.name" maxlength="100" required
               /></label>
-              <details class="builder-exercise-details">
-                <summary>Modifica esercizio e serie</summary>
-                <ExerciseGroup :exercise="e" :exercises="day.payload.exercises" />
-                <label
-                  >Variante<select :value="e.variant?.id || ''" @change="chooseVariant(e, $event)">
-                    <option value="">Standard</option>
-                    <option
-                      v-if="e.variant && !variants(e).some((v) => v.id === e.variant?.id)"
-                      :value="e.variant.id"
-                    >
-                      {{ e.variant.name }} (salvata)
-                    </option>
-                    <option v-for="v in variants(e)" :key="v.id" :value="v.id">{{ v.name }}</option>
-                  </select></label
-                >
-                <label
-                  >Sposta in<select value="" @change="moveExercise(day, i, $event)">
-                    <option value="">Scegli giornata</option>
-                    <option
-                      v-for="other in days.filter((d) => d.id !== day.id)"
-                      :key="other.id"
-                      :value="other.id"
-                    >
-                      {{ other.payload.name }}
-                    </option>
-                  </select></label
-                >
-                <div class="button-group">
-                  <button
-                    type="button"
-                    class="text-btn"
-                    :disabled="i === 0"
-                    @click="
-                      [day.payload.exercises[i - 1], day.payload.exercises[i]] = [
-                        day.payload.exercises[i]!,
-                        day.payload.exercises[i - 1]!,
-                      ]
-                    "
-                  >
-                    Sposta sopra</button
-                  ><button
-                    type="button"
-                    class="text-btn"
-                    :disabled="i === day.payload.exercises.length - 1"
-                    @click="
-                      [day.payload.exercises[i + 1], day.payload.exercises[i]] = [
-                        day.payload.exercises[i]!,
-                        day.payload.exercises[i + 1]!,
-                      ]
-                    "
-                  >
-                    Sposta sotto
-                  </button>
-                </div>
-                <div v-for="(set, index) in e.sets" :key="index" class="builder-set">
-                  <label class="builder-check"
-                    ><input
-                      type="checkbox"
-                      :checked="set.countVolume !== false"
-                      @change="set.countVolume = ($event.target as HTMLInputElement).checked"
-                    />Serie {{ index + 1 }} · volume</label
-                  >
-                  <label v-if="!set.segments?.length"
-                    >{{ e.measurement === 'duration' ? 'Secondi' : 'Ripetizioni'
-                    }}<StableNumberInput
-                      :value="e.measurement === 'duration' ? set.tut : set.reps"
-                      :min="1"
-                      :max="2000"
-                      :step="1"
-                      @commit="e.measurement === 'duration' ? (set.tut = $event) : (set.reps = $event)"
-                  /></label>
-                  <label v-if="!set.segments?.length"
-                    >Kg<StableNumberInput
-                      :value="set.load"
-                      :min="0"
-                      :max="2000"
-                      :step="0.5"
-                      @commit="set.load = $event"
-                  /></label>
-                  <SetTechnique :set="set" :measurement="e.measurement" />
-                </div>
-                <button type="button" class="text-btn danger" @click="day.payload.exercises.splice(i, 1)">
-                  Rimuovi esercizio
-                </button>
+              <p class="builder-day-meta">
+                {{ day.payload.exercises.length }} esercizi ·
+                {{ day.payload.exercises.reduce((n, e) => n + e.sets.length, 0) }} serie
+              </p>
+              <details class="builder-day-notes">
+                <summary>Note giornata</summary>
+                <textarea v-model="day.payload.notes" aria-label="Note giornata" maxlength="4000" rows="2" />
               </details>
-            </article>
-            <p v-if="!day.payload.exercises.length" class="notice">
-              Seleziona questa giornata e aggiungi gli esercizi dal catalogo.
-            </p>
-          </section>
+              <article v-for="(e, i) in day.payload.exercises" :key="e.id" class="builder-exercise">
+                <h3>{{ i + 1 }}. {{ e.name }}</h3>
+                <p v-if="e.variant" class="builder-variant">{{ e.variant.name }}</p>
+                <span class="builder-technique">{{ techniqueSummary(e) }}</span>
+                <p class="builder-prescription">
+                  <strong>{{ e.sets.length }} × {{ repsSummary(e) }}</strong>
+                  {{ e.measurement === 'duration' ? 's' : 'rep' }}
+                </p>
+                <label class="builder-count"
+                  >Numero di serie<input
+                    type="number"
+                    :value="e.sets.length"
+                    min="1"
+                    max="30"
+                    required
+                    @change="setCount(e, $event)"
+                /></label>
+                <details class="builder-exercise-details">
+                  <summary>Modifica esercizio e serie</summary>
+                  <ExerciseGroup :exercise="e" :exercises="day.payload.exercises" />
+                  <label
+                    >Variante<select :value="e.variant?.id || ''" @change="chooseVariant(e, $event)">
+                      <option value="">Standard</option>
+                      <option
+                        v-if="e.variant && !variants(e).some((v) => v.id === e.variant?.id)"
+                        :value="e.variant.id"
+                      >
+                        {{ e.variant.name }} (salvata)
+                      </option>
+                      <option v-for="v in variants(e)" :key="v.id" :value="v.id">{{ v.name }}</option>
+                    </select></label
+                  >
+                  <label
+                    >Sposta in<select value="" @change="moveExercise(day, i, $event)">
+                      <option value="">Scegli giornata</option>
+                      <option
+                        v-for="other in days.filter((d) => d.id !== day.id)"
+                        :key="other.id"
+                        :value="other.id"
+                      >
+                        {{ other.payload.name }}
+                      </option>
+                    </select></label
+                  >
+                  <div class="button-group">
+                    <button
+                      type="button"
+                      class="text-btn"
+                      :disabled="i === 0"
+                      @click="
+                        [day.payload.exercises[i - 1], day.payload.exercises[i]] = [
+                          day.payload.exercises[i]!,
+                          day.payload.exercises[i - 1]!,
+                        ]
+                      "
+                    >
+                      Sposta sopra</button
+                    ><button
+                      type="button"
+                      class="text-btn"
+                      :disabled="i === day.payload.exercises.length - 1"
+                      @click="
+                        [day.payload.exercises[i + 1], day.payload.exercises[i]] = [
+                          day.payload.exercises[i]!,
+                          day.payload.exercises[i + 1]!,
+                        ]
+                      "
+                    >
+                      Sposta sotto
+                    </button>
+                  </div>
+                  <div v-for="(set, index) in e.sets" :key="index" class="builder-set">
+                    <label class="builder-check"
+                      ><input
+                        type="checkbox"
+                        :checked="set.countVolume !== false"
+                        @change="set.countVolume = ($event.target as HTMLInputElement).checked"
+                      />Serie {{ index + 1 }} · volume</label
+                    >
+                    <label v-if="!set.segments?.length"
+                      >{{ e.measurement === 'duration' ? 'Secondi' : 'Ripetizioni'
+                      }}<StableNumberInput
+                        :value="e.measurement === 'duration' ? set.tut : set.reps"
+                        :min="1"
+                        :max="2000"
+                        :step="1"
+                        @commit="e.measurement === 'duration' ? (set.tut = $event) : (set.reps = $event)"
+                    /></label>
+                    <label v-if="!set.segments?.length"
+                      >Kg<StableNumberInput
+                        :value="set.load"
+                        :min="0"
+                        :max="2000"
+                        :step="0.5"
+                        @commit="set.load = $event"
+                    /></label>
+                    <SetTechnique :set="set" :measurement="e.measurement" />
+                  </div>
+                  <button type="button" class="text-btn danger" @click="day.payload.exercises.splice(i, 1)">
+                    Rimuovi esercizio
+                  </button>
+                </details>
+              </article>
+              <p v-if="!day.payload.exercises.length" class="notice">
+                Seleziona questa giornata e aggiungi gli esercizi dal catalogo.
+              </p>
+            </section>
+          </div>
         </div>
-        <aside class="builder-recap">
+        <section class="builder-recap" aria-label="Volume totale della scheda">
           <h3>Recap scheda</h3>
           <VolumeSummary :exercises="allExercises" :catalog="catalog" />
           <p class="notice">
             I target non impostati nel catalogo contano 0. Cluster e drop contano una serie per tutti i
             passaggi.
           </p>
-        </aside>
+        </section>
       </div>
       <p v-if="error" role="alert">{{ error }}</p>
       <button type="button" class="text-btn" @click="resetDraft">Riparti dalle giornate salvate</button>
@@ -374,14 +376,23 @@ async function save() {
   gap: 8px 14px;
 }
 .builder-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 250px;
-  gap: 20px;
-  align-items: start;
+  display: block;
+  min-width: 0;
+}
+.builder-board {
+  width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding-bottom: 8px;
+}
+.builder-board:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 2px;
 }
 .builder-days {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(190px, 1fr);
   gap: 12px;
   align-items: start;
   margin: 16px 0;
@@ -458,13 +469,13 @@ async function save() {
   width: auto;
 }
 .builder-recap {
-  position: sticky;
-  top: 0;
+  margin-top: 20px;
   padding-top: 16px;
+  border-top: 1px solid var(--line);
 }
 .builder-recap :deep(.muscle-grid) {
-  grid-template-columns: 1fr;
-  gap: 7px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px 24px;
 }
 .builder-recap :deep(.muscle-grid > div) {
   display: flex;
@@ -479,12 +490,8 @@ async function save() {
   margin-top: 8px;
 }
 @media (max-width: 760px) {
-  .builder-layout {
-    grid-template-columns: 1fr;
-  }
-  .builder-recap {
-    position: static;
-    grid-row: 1;
+  .builder-days {
+    grid-auto-columns: minmax(240px, 80vw);
   }
   .builder-recap :deep(.muscle-grid) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
