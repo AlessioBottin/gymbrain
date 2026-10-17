@@ -51,9 +51,37 @@ test('Builder: personal targets, multiple days, volume, offline draft and multip
       .filter({ has: page.locator('dt', { hasText: /^Tricipiti$/ }) })
       .locator('dd'),
   ).toHaveText('1');
+  const addToUpper = builder.getByRole('button', { name: 'Aggiungi esercizio a Upper body', exact: true });
+  await addToUpper.click();
+  const picker = page.getByRole('dialog', { name: 'AGGIUNGI ESERCIZIO', exact: true });
+  await expect(picker.getByRole('heading', { name: 'Upper body', exact: true })).toBeVisible();
+  await picker.getByRole('searchbox', { name: 'Cerca esercizio' }).fill('non-esiste');
+  await expect(picker.getByText('Nessun esercizio trovato.')).toBeVisible();
+  await picker.getByRole('searchbox', { name: 'Cerca esercizio' }).fill('push');
+  await expect(picker.locator('.builder-picker-item')).toHaveCount(1);
+  await page.screenshot({ path: 'preview-artifacts/builder-exercise-picker.png' });
+  await picker.getByRole('button', { name: 'Aggiungi Push test', exact: true }).click();
+  await expect(picker).not.toBeVisible();
+  await expect(addToUpper).toBeFocused();
+  await expect(
+    builder
+      .locator('.builder-day')
+      .first()
+      .getByRole('heading', { name: /Push test/ }),
+  ).toHaveCount(1);
+  await expect(
+    total
+      .locator('dl > div')
+      .filter({ has: page.locator('dt', { hasText: /^Petto$/ }) })
+      .locator('dd'),
+  ).toHaveText('3');
+  await addToUpper.click();
+  await page.keyboard.press('Escape');
+  await expect(picker).not.toBeVisible();
+  await expect(builder).toBeVisible();
   await builder.getByRole('button', { name: 'Chiudi', exact: true }).click();
   await page.getByRole('button', { name: 'Apri builder scheda' }).click();
-  await expect(builder.getByRole('heading', { name: /Push test/ })).toHaveCount(2);
+  await expect(builder.getByRole('heading', { name: /Push test/ })).toHaveCount(3);
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await builder.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
   expect(await builder.locator('.builder-board').evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(

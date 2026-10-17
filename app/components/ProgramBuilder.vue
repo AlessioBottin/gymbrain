@@ -23,12 +23,32 @@ const days = ref<Day[]>([]),
   selectedExercise = ref(''),
   saving = ref(false),
   error = ref('');
+const pickerDayId = ref(''),
+  pickerSearch = ref('');
+const pickerDay = computed(() => days.value.find((day) => day.id === pickerDayId.value));
+const pickerExercises = computed(() => {
+  const query = pickerSearch.value.trim().toLocaleLowerCase('it-IT');
+  return props.catalog.filter((row) =>
+    (row.payload as Exercise).name.toLocaleLowerCase('it-IT').includes(query),
+  );
+});
+function openExercisePicker(day: Day) {
+  pickerSearch.value = '';
+  pickerDayId.value = day.id;
+}
+function addToPickerDay(row: LocalRecord) {
+  const day = pickerDay.value;
+  if (!day || day.payload.exercises.length >= 50) return;
+  day.payload.exercises.push(makePrescription(row));
+  pickerDayId.value = '';
+}
 const weekdays = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 const key = computed(() => `gymbrain-draft:${props.owner}:builder:${props.plan.id}`);
 const allExercises = computed(() => days.value.flatMap((d) => d.payload.exercises));
 watch(
   () => props.open,
   (value) => {
+    pickerDayId.value = '';
     if (!value) return;
     error.value = '';
     selectedDays.value = [];
@@ -203,9 +223,21 @@ async function save() {
         <div class="builder-board" role="region" aria-label="Giornate della scheda affiancate" tabindex="0">
           <div class="builder-days">
             <section v-for="day in days" :key="day.id" class="builder-day">
-              <label class="builder-day-name"
-                >Giornata<input v-model="day.payload.name" maxlength="100" required
-              /></label>
+              <div class="builder-day-heading">
+                <label class="builder-day-name"
+                  >Giornata<input v-model="day.payload.name" maxlength="100" required
+                /></label>
+                <button
+                  type="button"
+                  class="icon-btn builder-day-add"
+                  :aria-label="`Aggiungi esercizio a ${day.payload.name}`"
+                  title="Aggiungi esercizio"
+                  :disabled="saving || day.payload.exercises.length >= 50"
+                  @click="openExercisePicker(day)"
+                >
+                  <GIcon name="plus" :size="22" />
+                </button>
+              </div>
               <p class="builder-day-meta">
                 {{ day.payload.exercises.length }} esercizi ·
                 {{ day.payload.exercises.reduce((n, e) => n + e.sets.length, 0) }} serie
@@ -318,7 +350,7 @@ async function save() {
                 </details>
               </article>
               <p v-if="!day.payload.exercises.length" class="notice">
-                Seleziona questa giornata e aggiungi gli esercizi dal catalogo.
+                Premi + per scegliere gli esercizi di questa giornata.
               </p>
             </section>
           </div>
@@ -336,8 +368,96 @@ async function save() {
       <button type="button" class="text-btn" @click="resetDraft">Riparti dalle giornate salvate</button>
     </form>
   </AppModal>
+  <AppModal :open="open && !!pickerDay" title="AGGIUNGI ESERCIZIO" @close="pickerDayId = ''">
+    <div v-if="pickerDay" class="builder-picker">
+      <h2>{{ pickerDay.payload.name }}</h2>
+      <label
+        >Cerca esercizio<input
+          v-model="pickerSearch"
+          type="search"
+          placeholder="Nome dell'esercizio"
+          autofocus
+      /></label>
+      <p class="notice">Scegli un esercizio per aggiungerlo a questa giornata.</p>
+      <p v-if="!catalog.length" role="status">
+        Il catalogo è vuoto. Crea prima i tuoi esercizi nella sezione Esercizi.
+      </p>
+      <p v-else-if="!pickerExercises.length" role="status">Nessun esercizio trovato.</p>
+      <div class="builder-picker-list">
+        <button
+          v-for="row in pickerExercises"
+          :key="row.id"
+          type="button"
+          class="builder-picker-item"
+          :aria-label="`Aggiungi ${(row.payload as Exercise).name}`"
+          :disabled="pickerDay.payload.exercises.length >= 50"
+          @click="addToPickerDay(row)"
+        >
+          <span
+            ><strong>{{ (row.payload as Exercise).name }}</strong
+            ><small>{{
+              (row.payload as Exercise).exerciseType === 'weights' ? 'Pesi' : 'Corpo libero'
+            }}</small></span
+          ><GIcon name="plus" />
+        </button>
+      </div>
+    </div>
+  </AppModal>
 </template>
 <style scoped>
+.builder-day-heading {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+}
+.builder-day-heading .builder-day-name {
+  flex: 1;
+  min-width: 0;
+}
+.builder-day-add {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  margin-bottom: 5px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--lime);
+}
+.builder-picker h2 {
+  margin: 8px 0;
+}
+.builder-picker-list {
+  display: grid;
+  gap: 8px;
+  max-height: 50dvh;
+  overflow-y: auto;
+}
+.builder-picker-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 14px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.builder-picker-item strong,
+.builder-picker-item small {
+  display: block;
+}
+.builder-picker-item strong {
+  overflow-wrap: anywhere;
+}
+.builder-picker-item small {
+  color: var(--muted);
+  margin-top: 4px;
+}
+.builder-picker-item:hover {
+  border-color: var(--lime);
+}
+
 .builder-toolbar {
   height: auto;
   min-height: 50px;
