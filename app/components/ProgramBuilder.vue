@@ -24,12 +24,13 @@ const days = ref<Day[]>([]),
   error = ref('');
 const pickerDayId = ref(''),
   pickerSearch = ref('');
-const flowStage = ref<'exercise' | 'variant' | 'sets'>('exercise');
+const flowStage = ref<'exercise' | 'variant' | 'sets' | 'destination'>('exercise');
 const candidateRow = ref<LocalRecord>();
 const editExercises = ref<Prescription[]>([]),
   editIndex = ref(0),
   editingExisting = ref(false);
 const settingsError = ref('');
+const destinationDayId = ref('');
 const dayMenuOpen = ref(false);
 const pickerDay = computed(() => days.value.find((day) => day.id === pickerDayId.value));
 const editExercise = computed(() => editExercises.value[editIndex.value]);
@@ -47,9 +48,12 @@ const flowTitle = computed(() =>
     ? 'AGGIUNGI ESERCIZIO'
     : flowStage.value === 'variant'
       ? 'SCEGLI LA VARIANTE'
-      : 'IMPOSTA LE SERIE',
+      : flowStage.value === 'destination'
+        ? 'SCEGLI LA GIORNATA'
+        : 'IMPOSTA LE SERIE',
 );
 function openExercisePicker(day: Day) {
+  destinationDayId.value = '';
   pickerSearch.value = '';
   candidateRow.value = undefined;
   flowStage.value = 'exercise';
@@ -76,6 +80,7 @@ function prepareNewExercise(variantId = '') {
   flowStage.value = 'sets';
 }
 function openSetEditor(day: Day, index: number) {
+  destinationDayId.value = '';
   editingExisting.value = true;
   candidateRow.value = undefined;
   editExercises.value = JSON.parse(JSON.stringify(day.payload.exercises));
@@ -90,6 +95,14 @@ function applyExerciseSettings() {
     const valid = editExercises.value.map((e) => prescriptionSchema.parse(e));
     if (!editingExisting.value && pickerDay.value.payload.exercises.length >= 50)
       throw new Error('Una giornata ha raggiunto il limite di 50 esercizi.');
+    if (destinationDayId.value && destinationDayId.value !== pickerDay.value.id) {
+      const target = days.value.find((d) => d.id === destinationDayId.value);
+      if (!target || target.payload.exercises.length >= 50)
+        throw new Error('La giornata di destinazione non ha spazio disponibile.');
+      const [moved] = valid.splice(editIndex.value, 1);
+      target.payload.exercises.push({ ...moved!, group: undefined });
+      clearOrphanGroups(valid);
+    }
     pickerDay.value.payload.exercises = valid;
     pickerDayId.value = '';
   } catch (e) {
@@ -179,12 +192,27 @@ function chooseVariant(e: Prescription, event: Event) {
   const variant = variants(e).find((v) => v.id === (event.target as HTMLSelectElement).value);
   e.variant = variant ? JSON.parse(JSON.stringify(variant)) : null;
 }
-function moveExercise(day: Day, index: number, event: Event) {
-  const select = event.target as HTMLSelectElement;
-  const target = days.value.find((d) => d.id === select.value);
-  if (target && target.payload.exercises.length < 50)
-    target.payload.exercises.push({ ...day.payload.exercises.splice(index, 1)[0]!, group: undefined });
-  select.value = '';
+function clearOrphanGroups(exercises: Prescription[]) {
+  for (const exercise of exercises)
+    if (exercise.group && exercises.filter((e) => e.group?.id === exercise.group?.id).length < 2)
+      exercise.group = undefined;
+}
+function reorderExercise(offset: number) {
+  const next = editIndex.value + offset;
+  if (next < 0 || next >= editExercises.value.length) return;
+  [editExercises.value[editIndex.value], editExercises.value[next]] = [
+    editExercises.value[next]!,
+    editExercises.value[editIndex.value]!,
+  ];
+  editIndex.value = next;
+}
+function removeExercise() {
+  if (!pickerDay.value || !editExercise.value) return;
+  pickerDay.value.payload.exercises = pickerDay.value.payload.exercises.filter(
+    (e) => e.id !== editExercise.value!.id,
+  );
+  clearOrphanGroups(pickerDay.value.payload.exercises);
+  pickerDayId.value = '';
 }
 function setCount(e: Prescription, event: Event) {
   const count = Number((event.target as HTMLInputElement).value);
@@ -317,51 +345,6 @@ async function save(): Promise<boolean> {
                 >
                   <GIcon name="edit" :size="18" />
                 </button>
-                <details class="builder-exercise-details">
-                  <summary>Organizza esercizio</summary>
-                  <label
-                    >Sposta in<select value="" @change="moveExercise(day, i, $event)">
-                      <option value="">Scegli giornata</option>
-                      <option
-                        v-for="other in days.filter((d) => d.id !== day.id)"
-                        :key="other.id"
-                        :value="other.id"
-                      >
-                        {{ other.payload.name }}
-                      </option>
-                    </select></label
-                  >
-                  <div class="button-group">
-                    <button
-                      type="button"
-                      class="text-btn"
-                      :disabled="i === 0"
-                      @click="
-                        [day.payload.exercises[i - 1], day.payload.exercises[i]] = [
-                          day.payload.exercises[i]!,
-                          day.payload.exercises[i - 1]!,
-                        ]
-                      "
-                    >
-                      Sposta sopra</button
-                    ><button
-                      type="button"
-                      class="text-btn"
-                      :disabled="i === day.payload.exercises.length - 1"
-                      @click="
-                        [day.payload.exercises[i + 1], day.payload.exercises[i]] = [
-                          day.payload.exercises[i]!,
-                          day.payload.exercises[i + 1]!,
-                        ]
-                      "
-                    >
-                      Sposta sotto
-                    </button>
-                  </div>
-                  <button type="button" class="text-btn danger" @click="day.payload.exercises.splice(i, 1)">
-                    Rimuovi esercizio
-                  </button>
-                </details>
               </article>
               <p v-if="!day.payload.exercises.length" class="notice">
                 Premi + per scegliere gli esercizi di questa giornata.
@@ -458,10 +441,63 @@ async function save(): Promise<boolean> {
         </div>
         <button type="button" class="text-btn" @click="flowStage = 'exercise'">Cambia esercizio</button>
       </template>
+      <template v-else-if="flowStage === 'destination'">
+        <p>Scegli dove spostare {{ editExercise?.name }}.</p>
+        <div class="builder-picker-list">
+          <button
+            v-for="day in days.filter((d) => d.id !== pickerDayId)"
+            :key="day.id"
+            type="button"
+            class="builder-picker-item"
+            :disabled="day.payload.exercises.length >= 50"
+            @click="
+              destinationDayId = day.id;
+              flowStage = 'sets';
+            "
+          >
+            {{ day.payload.name }}
+          </button>
+        </div>
+        <button type="button" class="secondary" @click="flowStage = 'sets'">Indietro</button>
+      </template>
       <form v-else-if="editExercise" @submit.prevent="applyExerciseSettings" class="builder-set-form">
         <h3>
           {{ editExercise.name }}<span v-if="editExercise.variant"> · {{ editExercise.variant.name }}</span>
         </h3>
+        <div v-if="editingExisting" class="builder-organize">
+          <div class="button-group">
+            <button
+              type="button"
+              class="secondary"
+              :disabled="editIndex === 0 || !!destinationDayId"
+              @click="reorderExercise(-1)"
+            >
+              Sposta sopra
+            </button>
+            <button
+              type="button"
+              class="secondary"
+              :disabled="editIndex === editExercises.length - 1 || !!destinationDayId"
+              @click="reorderExercise(1)"
+            >
+              Sposta sotto
+            </button>
+            <button
+              type="button"
+              class="secondary"
+              :disabled="days.length < 2"
+              @click="flowStage = 'destination'"
+            >
+              Sposta in un'altra giornata
+            </button>
+            <button type="button" class="text-btn danger" @click="removeExercise">Rimuovi esercizio</button>
+          </div>
+          <p v-if="destinationDayId" role="status">
+            Destinazione: {{ days.find((d) => d.id === destinationDayId)?.payload.name }}. Lo spostamento
+            avviene alla conferma.
+            <button type="button" class="text-btn" @click="destinationDayId = ''">Annulla spostamento</button>
+          </p>
+        </div>
         <label v-if="variants(editExercise).length || editExercise.variant"
           >Variante<select
             :value="editExercise.variant?.id || ''"

@@ -98,6 +98,28 @@ test('Builder: personal targets, multiple days, volume, offline draft and multip
   await settings.getByLabel('Numero di serie').press('Tab');
   await settings.getByRole('button', { name: 'Annulla', exact: true }).click();
   await expect(card.locator('.builder-prescription')).toContainText('1');
+  await expect(builder.getByText('Organizza esercizio', { exact: true })).toHaveCount(0);
+  await card.getByRole('button', { name: 'Modifica serie di Push test' }).click();
+  await settings.getByRole('button', { name: "Sposta in un'altra giornata", exact: true }).click();
+  const destination = page.getByRole('dialog', { name: 'SCEGLI LA GIORNATA', exact: true });
+  await destination.getByRole('button', { name: 'Lower body', exact: true }).click();
+  await settings.getByRole('button', { name: 'Annulla', exact: true }).click();
+  await expect(card).toHaveCount(1);
+  await card.getByRole('button', { name: 'Modifica serie di Push test' }).click();
+  await settings.getByRole('button', { name: "Sposta in un'altra giornata", exact: true }).click();
+  await destination.getByRole('button', { name: 'Lower body', exact: true }).click();
+  await settings.getByRole('button', { name: 'Conferma modifiche' }).click();
+  await expect(card).toHaveCount(0);
+  const moved = builder
+    .locator('.builder-day')
+    .nth(1)
+    .locator('.builder-exercise')
+    .filter({ hasText: 'Push test' });
+  await expect(moved).toContainText('Deep');
+  await moved.getByRole('button', { name: 'Modifica serie di Push test' }).click();
+  await settings.getByRole('button', { name: "Sposta in un'altra giornata", exact: true }).click();
+  await destination.getByRole('button', { name: 'Upper body', exact: true }).click();
+  await settings.getByRole('button', { name: 'Conferma modifiche' }).click();
 
   await expect(
     builder
