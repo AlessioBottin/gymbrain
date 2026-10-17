@@ -493,7 +493,15 @@ async function save(): Promise<boolean> {
             >
               Sposta in un'altra giornata
             </button>
-            <button type="button" class="text-btn danger" @click="removeExercise">Rimuovi esercizio</button>
+            <button
+              type="button"
+              class="icon-btn danger"
+              @click="removeExercise"
+              aria-label="Rimuovi esercizio"
+              title="Rimuovi esercizio"
+            >
+              <GIcon name="trash" :size="18" />
+            </button>
           </div>
           <p v-if="destinationDayId" role="status">
             Destinazione: {{ days.find((d) => d.id === destinationDayId)?.payload.name }}. Lo spostamento

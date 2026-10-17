@@ -700,7 +700,14 @@ const date = (value: string) =>
                     </select></label
                   ><button class="secondary" @click="openEditor('cycle')">Nuovo mesociclo +</button
                   ><button class="text-btn" @click="openEditor('cycle', cycle)">Modifica</button
-                  ><button class="text-btn danger" @click="deleteRecord = cycle!">Elimina</button>
+                  ><button
+                    class="icon-btn danger"
+                    @click="deleteRecord = cycle!"
+                    aria-label="Elimina"
+                    title="Elimina"
+                  >
+                    <GIcon name="trash" :size="18" />
+                  </button>
                 </div>
                 <div class="dashboard">
                   <section class="hero">
@@ -910,14 +917,22 @@ const date = (value: string) =>
                         Nuova giornata +</button
                       ><button v-if="workout" class="text-btn" @click="openEditor('workout', workout)">
                         Modifica giornata</button
-                      ><button v-if="workout" class="text-btn danger" @click="deleteRecord = workout!">
-                        Elimina giornata</button
+                      ><button
+                        v-if="workout"
+                        class="icon-btn danger"
+                        @click="deleteRecord = workout!"
+                        aria-label="Elimina giornata"
+                        title="Elimina giornata"
+                      >
+                        <GIcon name="trash" :size="18" /></button
                       ><button
                         v-if="plan && !workouts.length"
-                        class="text-btn danger"
+                        class="icon-btn danger"
                         @click="deleteRecord = plan!"
+                        aria-label="Elimina scheda"
+                        title="Elimina scheda"
                       >
-                        Elimina scheda
+                        <GIcon name="trash" :size="18" />
                       </button>
                     </div>
                   </section>
@@ -1004,10 +1019,16 @@ const date = (value: string) =>
                         accept="video/mp4,video/webm,video/quicktime"
                         :disabled="busy"
                         @change="uploadVideo(e, $event)" /></label
-                    ><button class="text-btn danger" @click="deleteRecord = e">Elimina</button>
-                  </div>
-                </article></TransitionGroup
-              >
+                    ><button
+                      class="icon-btn danger"
+                      @click="deleteRecord = e"
+                      aria-label="Elimina"
+                      title="Elimina"
+                    >
+                      <GIcon name="trash" :size="18" />
+                    </button>
+                  </div></article
+              ></TransitionGroup>
               <p v-if="!filteredCatalog.length" class="empty">
                 {{
                   search
@@ -1231,7 +1252,9 @@ const date = (value: string) =>
         Le sessioni già registrate conservano esercizi e prescrizioni originali. Mesocicli e schede devono
         essere svuotati prima di eliminarli.
       </p>
-      <button class="primary" @click="destroy">Conferma eliminazione</button></AppModal
+      <button class="primary" @click="destroy">
+        <GIcon name="trash" :size="18" /> Conferma eliminazione
+      </button></AppModal
     >
     <AppModal :open="logoutOpen" title="IL TUO ACCOUNT" @close="logoutOpen = false"
       ><h2>{{ local ? 'Tornare all’accesso?' : 'Uscire da questo dispositivo?' }}</h2>

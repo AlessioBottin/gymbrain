@@ -9,6 +9,7 @@ const paths: Record<string, string> = {
   arrowUp: 'M12 20V4m-6 6 6-6 6 6',
   arrowDown: 'M12 4v16m-6-6 6 6 6-6',
   plus: 'M12 5v14M5 12h14',
+  trash: 'M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7',
   edit: 'm16 3 5 5M3 21l5-1L21 7a2 2 0 0 0-5-5L3 15v6Z',
   check: 'm5 12 4 4L19 6',
   close: 'm6 6 12 12M6 18 18 6',

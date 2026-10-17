@@ -64,11 +64,13 @@ function technique(event: Event) {
         /></label>
         <button
           type="button"
-          class="text-btn"
+          class="icon-btn danger"
           :disabled="(set.segments?.length || 0) <= 2"
           @click="set.segments?.splice(i, 1)"
+          aria-label="Rimuovi passaggio"
+          title="Rimuovi passaggio"
         >
-          Rimuovi passaggio
+          <GIcon name="trash" :size="18" />
         </button>
       </div>
       <button

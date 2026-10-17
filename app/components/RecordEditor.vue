@@ -241,8 +241,14 @@ function clean(set: any, key: string, event: Event) {
               /></label>
               <MuscleTargets v-model="variant.muscleTargets" :inherited="draft.muscleTargets || {}" />
               <label>Note variante<textarea v-model="variant.notes" maxlength="4000" rows="2" /></label>
-              <button type="button" class="text-btn" @click="draft.variants.splice(i, 1)">
-                Rimuovi variante
+              <button
+                type="button"
+                class="icon-btn danger"
+                @click="draft.variants.splice(i, 1)"
+                aria-label="Rimuovi variante"
+                title="Rimuovi variante"
+              >
+                <GIcon name="trash" :size="18" />
               </button>
             </div>
             <button
@@ -323,11 +329,12 @@ function clean(set: any, key: string, event: Event) {
                   ↓</button
                 ><button
                   type="button"
-                  class="icon-btn"
+                  class="icon-btn danger"
                   aria-label="Rimuovi esercizio dalla giornata"
                   @click="prescriptions.splice(i, 1)"
+                  title="Rimuovi esercizio dalla giornata"
                 >
-                  ×
+                  <GIcon name="trash" :size="18" />
                 </button>
               </div>
             </div>
@@ -432,12 +439,13 @@ function clean(set: any, key: string, event: Event) {
                 @commit="s[k] = $event"
               /><button
                 type="button"
-                class="icon-btn"
+                class="icon-btn danger"
                 aria-label="Rimuovi serie"
                 :disabled="e.sets.length === 1"
                 @click="e.sets.splice(j, 1)"
+                title="Rimuovi serie"
               >
-                ×
+                <GIcon name="trash" :size="18" />
               </button>
             </div>
             <details>
