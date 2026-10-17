@@ -1,5 +1,5 @@
-import { saveRecord } from './store'
-import { newTarget, type Exercise, type Prescription, type LocalRecord } from '../../shared/domain'
+import { saveRecord } from './store';
+import { newTarget, type Exercise, type Prescription, type LocalRecord } from '../../shared/domain';
 export async function createStarter(owner: string) {
   const exercises: Exercise[] = [
     {
@@ -38,21 +38,27 @@ export async function createStarter(owner: string) {
       videoUrl: '',
       videoPath: '',
     },
-  ]
-  const rows: LocalRecord[] = []
-  for (const e of exercises) rows.push(await saveRecord(owner, 'exercise', e))
+  ];
+  const rows: LocalRecord[] = [];
+  for (const e of exercises) rows.push(await saveRecord(owner, 'exercise', e));
   const cycle = await saveRecord(owner, 'cycle', {
     name: 'Forza, sotto controllo.',
     notes: 'Un allenamento alla volta.',
     start: new Date().toISOString().slice(0, 10),
     weeks: 6,
-  })
+  });
   const plan = await saveRecord(
     owner,
     'plan',
-    { name: 'Accumulo', notes: 'Esecuzione controllata e progressione graduale.', order: 0 },
+    {
+      name: 'Accumulo',
+      notes: 'Esecuzione controllata e progressione graduale.',
+      order: 0,
+      start: new Date().toISOString().slice(0, 10),
+      end: new Date(Date.now() + 41 * 86400000).toISOString().slice(0, 10),
+    },
     { parentId: cycle.id },
-  )
+  );
   for (const [i, ids] of [
     [0, 1, 2],
     [3, 2],
@@ -67,9 +73,7 @@ export async function createStarter(owner: string) {
       variant: null,
       assistance: [],
       notes:
-        i === 0
-          ? 'Salita esplosiva, discesa controllata.'
-          : 'Mantieni il controllo durante il movimento.',
+        i === 0 ? 'Salita esplosiva, discesa controllata.' : 'Mantieni il controllo durante il movimento.',
       band: id === 0 && i === 2 ? 'Assistenza media' : '',
       alternatives: id === 0 ? [rows[2]!.id] : [],
       sets: Array.from({ length: 3 }, () => ({
@@ -77,7 +81,7 @@ export async function createStarter(owner: string) {
         reps: id === 0 ? 6 : 8,
         load: id === 0 && i === 0 ? 10 : id === 3 ? 60 : null,
       })),
-    }))
+    }));
     await saveRecord(
       owner,
       'workout',
@@ -88,7 +92,7 @@ export async function createStarter(owner: string) {
         exercises: prescriptions,
       },
       { parentId: plan.id },
-    )
+    );
   }
-  return { cycle: cycle.id, plan: plan.id }
+  return { cycle: cycle.id, plan: plan.id };
 }

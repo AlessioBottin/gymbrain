@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient, type Session } from '@supabase/supab
 import { liveQuery } from 'dexie';
 import { useImmersiveMotion } from './composables/useImmersiveMotion';
 import { db, saveRecord, synchronize, removeAccountCache, resolveConflict } from './lib/store';
+import { freezeTargets } from '../shared/volume';
 import { createStarter } from './lib/sample';
 import {
   snapshotSession,
@@ -45,7 +46,9 @@ const rows = ref<LocalRecord[]>([]),
   planId = ref(''),
   workoutId = ref(''),
   sessionRecord = ref<LocalRecord | null>(null),
-  focusMode = ref(false);
+  focusMode = ref(false),
+  builderOpen = ref(false),
+  selectedWorkouts = ref<string[]>([]);
 const withings = useWithings(auth, owner, local, online, sync);
 const whoop = useWhoop(auth, owner, local, online);
 useImmersiveMotion();
@@ -59,6 +62,7 @@ const updates = useAppUpdates(
       !ready.value ||
       !owner.value ||
       focusMode.value ||
+      builderOpen.value ||
       busy.value ||
       withings.loading.value ||
       whoop.loading.value ||
@@ -99,7 +103,13 @@ const sessions = computed(() =>
       ),
   ),
   completed = computed(() => sessions.value.filter((r) => (r.payload as TrainingSession).completedAt)),
-  ongoing = computed(() => sessions.value.find((r) => !(r.payload as TrainingSession).completedAt)),
+  ongoing = computed(() =>
+    sessions.value.find(
+      (r) =>
+        !(r.payload as TrainingSession).completedAt &&
+        (r.payload as TrainingSession).workoutId === workout.value?.id,
+    ),
+  ),
   weights = computed(() =>
     rows.value
       .filter((r) => r.kind === 'weight' && !r.deleted)
@@ -325,6 +335,49 @@ async function seed() {
     busy.value = false;
   }
 }
+function sessionSnapshot(row: LocalRecord) {
+  const snapshot = snapshotSession(row, latestWeight.value?.kg ?? null);
+  snapshot.exercises = snapshot.exercises.map((e) => ({ ...e, ...freezeTargets(e, catalog.value) }));
+  return snapshot;
+}
+watch(
+  () => plan.value?.id,
+  () => {
+    selectedWorkouts.value = [];
+    builderOpen.value = false;
+  },
+);
+async function startSelected() {
+  if (busy.value) return;
+  busy.value = true;
+  try {
+    const selected = workouts.value.filter((w) => selectedWorkouts.value.includes(w.id));
+    if (!selected.length || selected.some((w) => !(w.payload as Workout).exercises.length))
+      throw new Error('Seleziona allenamenti con almeno un esercizio.');
+    const started = await db.transaction('rw', db.records, db.queue, async () => {
+      const result: LocalRecord[] = [];
+      const existing = await db.records.where('[user_id+kind]').equals([owner.value, 'session']).toArray();
+      for (const w of selected) {
+        const active = existing.find(
+          (r) =>
+            !r.deleted &&
+            !(r.payload as TrainingSession).completedAt &&
+            (r.payload as TrainingSession).workoutId === w.id,
+        );
+        result.push(active || (await saveRecord(owner.value, 'session', sessionSnapshot(w))));
+      }
+      return result;
+    });
+    sessionRecord.value = started[0]!;
+    focusMode.value = true;
+    selectedWorkouts.value = [];
+    void sync();
+  } catch (e) {
+    notify(e instanceof Error ? e.message : String(e));
+  } finally {
+    busy.value = false;
+  }
+}
 async function start() {
   try {
     if (ongoing.value) {
@@ -336,11 +389,7 @@ async function start() {
       notify('Aggiungi almeno un esercizio alla giornata.');
       return;
     }
-    sessionRecord.value = await saveRecord(
-      owner.value,
-      'session',
-      snapshotSession(workout.value, latestWeight.value?.kg ?? null),
-    );
+    sessionRecord.value = await saveRecord(owner.value, 'session', sessionSnapshot(workout.value));
     focusMode.value = true;
   } catch (e) {
     notify(String(e));
@@ -752,6 +801,49 @@ const date = (value: string) =>
                         Modifica
                       </button>
                     </div>
+                    <p v-if="plan && (plan.payload as any).start" class="subtle">
+                      Periodo: {{ date((plan.payload as any).start) }} – {{ date((plan.payload as any).end) }}
+                    </p>
+                    <button v-if="plan && view === 'percorso'" class="secondary" @click="builderOpen = true">
+                      Apri builder scheda
+                    </button>
+                    <fieldset v-if="workouts.length">
+                      <legend>Avvia uno o più allenamenti</legend>
+                      <label
+                        v-for="w in workouts"
+                        :key="w.id"
+                        style="display: flex; align-items: center; gap: 8px"
+                        ><input
+                          v-model="selectedWorkouts"
+                          type="checkbox"
+                          :value="w.id"
+                          style="width: auto"
+                        />{{ (w.payload as Workout).name }}</label
+                      >
+                      <button
+                        class="secondary"
+                        :disabled="!selectedWorkouts.length || busy"
+                        @click="startSelected"
+                      >
+                        Avvia selezionati
+                      </button>
+                    </fieldset>
+                    <div
+                      v-if="sessions.some((r) => !(r.payload as TrainingSession).completedAt)"
+                      class="button-group"
+                    >
+                      <button
+                        v-for="s in sessions.filter((r) => !(r.payload as TrainingSession).completedAt)"
+                        :key="s.id"
+                        class="text-btn"
+                        @click="
+                          sessionRecord = s;
+                          focusMode = true;
+                        "
+                      >
+                        Riprendi: {{ (s.payload as TrainingSession).name }}
+                      </button>
+                    </div>
                     <p v-if="plan" class="subtle">{{ (plan.payload as any).notes }}</p>
                     <div class="days">
                       <button
@@ -1104,6 +1196,16 @@ const date = (value: string) =>
       </button>
       <p role="status">{{ whoop.message.value }}</p>
     </AppModal>
+    <ProgramBuilder
+      v-if="plan"
+      :open="builderOpen"
+      :owner="owner"
+      :plan="plan"
+      :workouts="workouts"
+      :catalog="catalog"
+      @close="builderOpen = false"
+      @saved="sync"
+    />
     <RecordEditor
       :owner="owner"
       :open="editor.open"
@@ -1178,6 +1280,16 @@ const date = (value: string) =>
             ><span>{{ s.load ?? '—' }} kg</span><span>RPE {{ s.rpe ?? '—' }}</span
             ><span>RIR {{ s.rir ?? '—' }}</span
             ><span v-if="e.measurement !== 'duration'">{{ s.tut ?? '—' }} s TUT</span>
+          </div>
+          <div v-for="(set, si) in e.actual" :key="'parts-' + si">
+            <p v-if="set.segments">
+              Serie {{ si + 1 }} · {{ set.technique === 'cluster' ? 'Cluster' : 'Drop' }}
+            </p>
+            <p v-for="(part, pi) in set.segments" :key="pi">
+              Passaggio {{ pi + 1 }}: {{ e.measurement === 'duration' ? part.tut : part.reps }}
+              {{ e.measurement === 'duration' ? 's' : 'rep' }} · {{ part.load ?? '—' }} kg ·
+              {{ part.done ? 'Completato' : 'Non completato' }}
+            </p>
           </div>
           <p class="session-note">{{ e.sessionNotes }}</p>
         </section></template

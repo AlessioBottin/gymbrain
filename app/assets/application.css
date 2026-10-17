@@ -565,8 +565,66 @@ dialog {
   margin: 18px 0;
   min-width: 0;
 }
-.assistance-picker legend { padding: 0 8px; font-weight: 700; }
-.assistance-picker .band-option { display: flex; align-items: center; gap: 12px; cursor: pointer; margin: 10px 0; }
-.assistance-picker .band-option input { width: 20px; height: 20px; flex: 0 0 20px; accent-color: #d2f76a; }
-.band-option small { color: #b2baa9; margin-left: 8px; white-space: nowrap; }
-.variant-editor { border-bottom: 1px solid #343b31; padding: 12px 0; margin-bottom: 16px; }
+.assistance-picker legend {
+  padding: 0 8px;
+  font-weight: 700;
+}
+.assistance-picker .band-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  margin: 10px 0;
+}
+.assistance-picker .band-option input {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  accent-color: #d2f76a;
+}
+.band-option small {
+  color: #b2baa9;
+  margin-left: 8px;
+  white-space: nowrap;
+}
+.variant-editor {
+  border-bottom: 1px solid #343b31;
+  padding: 12px 0;
+  margin-bottom: 16px;
+}
+
+.muscle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px 16px;
+}
+.muscle-grid dd {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+.muscle-targets,
+.volume-summary {
+  margin: 16px 0;
+  padding: 12px;
+  border: 1px solid #8b949755;
+  border-radius: 12px;
+}
+.muscle-targets summary,
+.volume-summary summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+dialog.session:has(.program-builder) {
+  width: min(1900px, 96vw);
+  max-width: 96vw;
+}
+
+dialog.session:has(.program-builder) {
+  background: #fbf8f0;
+  padding: 18px;
+}
+dialog:has(.program-builder) .modal-top {
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+}

@@ -7,6 +7,8 @@ import {
   type Exercise,
   newTarget,
 } from '../../shared/domain';
+import { trainingSequence, nextTrainingStep } from '../../shared/training';
+import { effectiveTargets } from '../../shared/volume';
 import { saveRecord } from '../lib/store';
 const props = defineProps<{
   open: boolean;
@@ -21,6 +23,7 @@ const draft = ref<TrainingSession | null>(null),
   saving = ref(false),
   saveError = ref(''),
   restUntil = ref(0),
+  restDuration = ref(90),
   now = ref(Date.now()),
   swapping = ref(false),
   replacement = ref(''),
@@ -33,7 +36,9 @@ watch(
   () => {
     draft.value = props.record ? sessionSchema.parse(JSON.parse(JSON.stringify(props.record.payload))) : null;
     revision.value = props.record?.localRevision || 0;
-    index.value = 0;
+    restUntil.value = 0;
+    restDuration.value = 90;
+    index.value = draft.value ? (nextTrainingStep(draft.value)?.exercise ?? 0) : 0;
   },
   { immediate: true },
 );
@@ -83,6 +88,29 @@ function numberChange(set: any, key: string, event: Event) {
   set[key] = value === '' ? null : Number(value);
   void persist();
 }
+const suggested = computed(() => (draft.value ? nextTrainingStep(draft.value) : undefined));
+function completeSegment(setIndex: number, partIndex: number) {
+  const set = current.value?.actual[setIndex],
+    part = set?.segments?.[partIndex];
+  if (!set || !part || set.done) return;
+  if (!part.done && !validRecordedSet(part, current.value?.measurement)) {
+    emit('error', 'Inserisci ripetizioni o secondi validi per il passaggio.');
+    return;
+  }
+  part.done = !part.done;
+  if (part.done) {
+    now.value = Date.now();
+    const last = partIndex === set.segments!.length - 1;
+    restDuration.value = !last && set.technique === 'cluster' ? (part.restSeconds ?? 20) : 0;
+    restUntil.value =
+      now.value + (!last && set.technique === 'cluster' ? (part.restSeconds ?? 20) : 0) * 1000;
+    if (set.segments!.every((s) => s.done)) {
+      check(setIndex);
+      return;
+    }
+  }
+  void persist();
+}
 function check(i: number) {
   const s = current.value!.actual[i]!;
   if (!s.done && !validRecordedSet(s, current.value!.measurement)) {
@@ -95,9 +123,15 @@ function check(i: number) {
     return;
   }
   s.done = !s.done;
-  if (s.done) {
+  if (s.done && draft.value) {
+    const step = trainingSequence(draft.value.exercises.map((e) => ({ ...e, sets: e.actual }))).find(
+      (step) => step.exercise === index.value && step.set === i,
+    );
     now.value = Date.now();
-    restUntil.value = now.value + 90000;
+    restDuration.value = step?.restSeconds ?? 90;
+    restUntil.value = now.value + restDuration.value * 1000;
+    const next = nextTrainingStep(draft.value);
+    if (next && current.value?.group) index.value = next.exercise;
   }
   void persist();
 }
@@ -107,9 +141,13 @@ const currentVariants = computed(
       ?.variants || [],
 );
 function changeVariant(id: string) {
-  if (!current.value) return;
+  if (!current.value || current.value.actual.some((s) => s.done || s.segments?.some((p) => p.done))) return;
   const v = currentVariants.value.find((v) => v.id === id);
-  current.value.variant = v ? { ...v } : null;
+  const source = props.catalog.find((r) => r.id === current.value!.exerciseId)?.payload as
+    | Exercise
+    | undefined;
+  current.value.muscleTargets = effectiveTargets(source?.muscleTargets, v?.muscleTargets);
+  current.value.variant = v ? { ...v, muscleTargets: {} } : null;
   void persist();
 }
 function changeAssistance(bands: TrainingSession['exercises'][number]['assistance']) {
@@ -122,6 +160,7 @@ function swap() {
     e = current.value;
   if (!row || !e) return;
   const data = row.payload as Exercise;
+  e.muscleTargets = { ...data.muscleTargets };
   e.exerciseId = row.id;
   e.name = data.name;
   e.exerciseType = data.exerciseType;
@@ -174,6 +213,14 @@ const modes: Record<string, string> = {
 <template>
   <AppModal :open="open" title="FOCUS MODE · IL TUO ALLENAMENTO" wide @close="close"
     ><div v-if="draft && current">
+      <p v-if="suggested" class="notice">
+        Prossimo: {{ draft.exercises[suggested.exercise]?.name }} · serie {{ suggested.set + 1
+        }}<button class="text-btn" @click="index = suggested.exercise">Vai all'esercizio</button>
+      </p>
+      <p v-if="current.group" class="badge">
+        {{ current.group.type === 'jump' ? 'Jump set' : 'Superset' }} · recupero
+        {{ current.group.restSeconds }} s {{ current.group.type === 'jump' ? 'tra esercizi' : 'tra giri' }}
+      </p>
       <p class="session-step">
         Esercizio {{ index + 1 }} di {{ draft.exercises.length }} ?
         {{ current.actual.filter((s) => s.done).length }} / {{ current.actual.length }} serie completate
@@ -282,6 +329,55 @@ const modes: Record<string, string> = {
               ></span
             >
           </div>
+          <div v-for="(set, si) in current.actual" :key="'technique-' + si">
+            <fieldset v-if="set.segments?.length">
+              <legend>
+                Serie {{ si + 1 }} · {{ set.technique === 'cluster' ? 'Cluster set' : 'Drop set' }}
+              </legend>
+              <div v-for="(part, pi) in set.segments" :key="pi" class="form-grid">
+                <p>
+                  Passaggio {{ pi + 1 }} · target
+                  {{
+                    current.targetSets[si]?.segments?.[pi]?.reps ??
+                    current.targetSets[si]?.segments?.[pi]?.tut ??
+                    '—'
+                  }}
+                  · {{ current.targetSets[si]?.segments?.[pi]?.load ?? '—' }} kg
+                </p>
+                <label
+                  >{{ current.measurement === 'duration' ? 'Secondi' : 'Ripetizioni'
+                  }}<StableNumberInput
+                    :value="current.measurement === 'duration' ? part.tut : part.reps"
+                    :disabled="part.done || set.done"
+                    min="1"
+                    max="2000"
+                    @commit="
+                      current.measurement === 'duration' ? (part.tut = $event) : (part.reps = $event);
+                      persist();
+                    "
+                /></label>
+                <label
+                  >Kg effettivi<StableNumberInput
+                    :value="part.load"
+                    :disabled="part.done || set.done"
+                    min="0"
+                    max="2000"
+                    step="0.5"
+                    @commit="
+                      part.load = $event;
+                      persist();
+                    "
+                /></label>
+                <button
+                  class="secondary"
+                  :disabled="set.done || (pi > 0 && !set.segments[pi - 1]?.done)"
+                  @click="completeSegment(si, pi)"
+                >
+                  {{ part.done ? 'Riapri' : 'Completa' }} passaggio {{ pi + 1 }}
+                </button>
+              </div>
+            </fieldset>
+          </div>
           <div class="actual-grid heading" :class="{ isometric: current.measurement === 'duration' }">
             <span>Set</span><span>{{ current.measurement === 'duration' ? 'Secondi' : 'Rep' }}</span
             ><span>Kg¹</span><span>RPE</span><span>RIR</span
@@ -296,9 +392,11 @@ const modes: Record<string, string> = {
             <span class="set-number">Serie {{ i + 1 }}</span
             ><label
               class="actual-field"
-              v-for="k in current.measurement === 'duration'
-                ? ['tut', 'load', 'rpe', 'rir']
-                : ['reps', 'load', 'rpe', 'rir', 'tut']"
+              v-for="k in s.segments?.length
+                ? ['rpe', 'rir']
+                : current.measurement === 'duration'
+                  ? ['tut', 'load', 'rpe', 'rir']
+                  : ['reps', 'load', 'rpe', 'rir', 'tut']"
               :key="k"
               ><span>{{
                 (
@@ -371,14 +469,16 @@ const modes: Record<string, string> = {
           class="secondary timer"
           @click="
             now = Date.now();
-            restUntil = remaining ? 0 : Date.now() + 90000;
+            restUntil = remaining ? 0 : Date.now() + restDuration * 1000;
           "
         >
           ◷
           {{
             remaining
               ? `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')} · interrompi`
-              : 'Recupero · 90 s'
+              : restDuration
+                ? `Recupero · ${restDuration} s`
+                : 'Nessuna pausa: prossimo esercizio'
           }}
         </button>
         <div class="button-group">

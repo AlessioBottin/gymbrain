@@ -138,3 +138,21 @@ Il client registra il service worker generato da Workbox e verifica aggiornament
 Il controllo richiede connessione e app aperta: su iOS non dipende da esecuzione in background. Un dispositivo che esegue ancora il vecchio client con aggiornamento manuale può richiedere una prima riapertura/"Aggiorna app"; da questa versione si applica il comportamento automatico.
 
 `tests/e2e/updates.spec.ts` serve due revisioni degli artefatti di produzione con il vero service worker, verifica aggiornamento automatico tra due schede, rinvio durante l'allenamento, mantenimento della coda e recupero della sessione offline. La verifica su iPhone fisico resta da effettuare.
+
+
+## Builder e volume muscolare
+
+In Percorso, ogni mesociclo può contenere più schede. Le schede nuove richiedono inizio e fine del periodo; quelle precedenti restano leggibili e si possono completare con Modifica. Apri builder scheda per vedere tutte le giornate, aggiungere giorni della settimana o giornate personalizzate, selezionare più destinazioni per un esercizio e spostare esercizi tra le colonne. Il salvataggio locale di tutte le giornate e delle relative operazioni offline è atomico; la sincronizzazione remota continua per singolo record con i controlli di conflitto esistenti.
+
+Nel catalogo, ogni utente definisce i propri coefficienti per muscolo da 0 a 1, a passi di 0,1. Le varianti ereditano i coefficienti non impostati; un override esplicito a 0 esclude quel muscolo. Petto incluso; deltoidi laterali e frontali costituiscono un unico gruppo, come nell'elenco richiesto. Nessun coefficiente fisiologico viene assegnato automaticamente agli esercizi esistenti.
+
+Il volume è il numero di serie incluse moltiplicato per il coefficiente personale: non è tonnellaggio né una stima clinica. Una casella per serie permette di escludere il riscaldamento. Il builder usa il catalogo personale corrente e mostra il totale per giornata e per scheda, senza moltiplicarlo per settimane. La sessione conserva uno snapshot dei coefficienti al suo avvio. Le giornate si possono avviare singolarmente o in selezione multipla; ogni sessione aperta ha un comando Riprendi.
+
+I campi sono opzionali nei record JSON per compatibilità con cache e sessioni precedenti. Non occorre una migrazione SQL; occorre distribuire insieme frontend e backend aggiornati prima di sincronizzare questi nuovi campi.
+
+
+### Tecniche di intensità
+
+Nel builder e nell'editor giornata, Gruppo di esecuzione crea un jump set o superset; gli altri esercizi si collegano allo stesso gruppo. L'ordine segue la giornata. Jump: recupero configurabile dopo ogni esercizio. Superset: nessuna pausa interna, recupero a fine giro. I giri seguono il numero di serie; se le quantità differiscono, gli esercizi terminati non partecipano ai giri rimanenti.
+
+Ogni serie può essere standard, cluster o drop. Cluster e drop contengono da 2 a 10 passaggi con ripetizioni/secondi e kg; il cluster ha pause interne configurabili, il drop no e i suoi carichi non possono aumentare. I passaggi contano complessivamente come una serie equivalente, salvo esclusione esplicita dal volume. La sessione registra ogni passaggio separatamente, suggerisce il prossimo esercizio e applica i recuperi del gruppo. Nell'esecuzione sono combinabili gruppi di esercizi e tecniche della singola serie.

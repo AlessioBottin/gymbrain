@@ -83,7 +83,13 @@ watch(
         : props.kind === 'cycle'
           ? { name: '', notes: '', start: new Date().toISOString().slice(0, 10), weeks: 6 }
           : props.kind === 'plan'
-            ? { name: '', notes: '', order: 0 }
+            ? {
+                name: '',
+                notes: '',
+                order: 0,
+                start: new Date().toISOString().slice(0, 10),
+                end: new Date().toISOString().slice(0, 10),
+              }
             : props.kind === 'weight'
               ? { kg: 75, measuredAt: new Date().toISOString(), source: 'manual' }
               : { name: '', notes: '', order: 0, exercises: [] };
@@ -108,6 +114,7 @@ function addExercise() {
   draft.value.exercises.push({
     id: crypto.randomUUID(),
     exerciseId: row.id,
+    muscleTargets: { ...e.muscleTargets },
     name: e.name,
     notes: '',
     mode: e.exerciseType === 'weights' ? 'external' : 'bodyweight',
@@ -220,6 +227,7 @@ function clean(set: any, key: string, event: Event) {
               <option value="duration">Isometria - secondi</option>
             </select></label
           >
+          <MuscleTargets v-model="draft.muscleTargets" />
           <fieldset class="assistance-picker">
             <legend>Varianti del movimento</legend>
             <p class="notice">Per esempio HSPU con variante Deep. Il sovraccarico si imposta nella scheda.</p>
@@ -231,6 +239,7 @@ function clean(set: any, key: string, event: Event) {
                   maxlength="100"
                   placeholder="Deep / profondo"
               /></label>
+              <MuscleTargets v-model="variant.muscleTargets" :inherited="draft.muscleTargets || {}" />
               <label>Note variante<textarea v-model="variant.notes" maxlength="4000" rows="2" /></label>
               <button type="button" class="text-btn" @click="draft.variants.splice(i, 1)">
                 Rimuovi variante
@@ -252,6 +261,10 @@ function clean(set: any, key: string, event: Event) {
               pattern="https://.*"
               placeholder="https://…" /></label
         ></template>
+        <div v-if="kind === 'plan'" class="form-grid">
+          <label>Inizio periodo<input v-model="draft.start" type="date" required /></label>
+          <label>Fine periodo<input v-model="draft.end" type="date" :min="draft.start" required /></label>
+        </div>
         <div v-if="kind === 'cycle'" class="form-grid">
           <label>Data di inizio<input v-model="draft.start" type="date" required /></label
           ><label
@@ -273,7 +286,8 @@ function clean(set: any, key: string, event: Event) {
           }}<textarea v-model="draft.notes" rows="2" maxlength="4000" /></label
       ></template>
       <template v-if="kind === 'workout'"
-        ><div class="add-exercise">
+        ><VolumeSummary :exercises="prescriptions" :catalog="catalog" />
+        <div class="add-exercise">
           <label
             >Aggiungi dal tuo catalogo<select v-model="selectedExercise">
               <option value="">Scegli esercizio</option>
@@ -350,6 +364,7 @@ function clean(set: any, key: string, event: Event) {
                 </option>
               </select></label
             >
+            <ExerciseGroup :exercise="e" :exercises="prescriptions" />
             <p v-if="e.variant?.notes" class="notice">{{ e.variant.notes }}</p>
             <p class="subtle">
               {{
@@ -398,7 +413,13 @@ function clean(set: any, key: string, event: Event) {
               class="target-editor"
               :class="{ isometric: e.measurement === 'duration' }"
             >
-              <span>{{ j + 1 }}</span
+              <span
+                ><input
+                  type="checkbox"
+                  :checked="s.countVolume !== false"
+                  :aria-label="`Serie ${j + 1} inclusa nel volume`"
+                  @change="s.countVolume = ($event.target as HTMLInputElement).checked"
+                />{{ j + 1 }}</span
               ><StableNumberInput
                 v-for="k in e.measurement === 'duration' ? (['tut', 'load', 'rpe', 'rir'] as const) : fields"
                 :key="k"
@@ -419,6 +440,13 @@ function clean(set: any, key: string, event: Event) {
                 ×
               </button>
             </div>
+            <details>
+              <summary>Tecniche e recuperi per serie</summary>
+              <div v-for="(set, index) in e.sets" :key="index">
+                <h4>Serie {{ index + 1 }}</h4>
+                <SetTechnique :set="set" :measurement="e.measurement" />
+              </div>
+            </details>
             <button
               type="button"
               class="text-btn"

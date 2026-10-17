@@ -264,3 +264,26 @@ export async function synchronize(
     );
   else await run();
 }
+
+// All day edits and outbox operations commit together, including conflict checks.
+export async function savePlanWorkouts(
+  owner: string,
+  planId: string,
+  days: { id: string; revision?: number; payload: import('../../shared/domain').Workout }[],
+) {
+  return db.transaction('rw', db.records, db.queue, async () => {
+    const plan = await db.records.get([owner, planId]);
+    if (!plan || plan.deleted || plan.kind !== 'plan' || plan.conflict)
+      throw new Error('Scheda non disponibile o in conflitto.');
+    for (const day of days) {
+      const previous = await db.records.get([owner, day.id]);
+      if (previous && (previous.deleted || previous.parent_id !== planId || day.revision === undefined))
+        throw new Error('Giornata modificata: riapri il builder.');
+      await saveRecord(owner, 'workout', day.payload, {
+        id: day.id,
+        parentId: planId,
+        expectedRevision: day.revision,
+      });
+    }
+  });
+}
