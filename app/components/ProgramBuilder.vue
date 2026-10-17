@@ -197,14 +197,11 @@ function clearOrphanGroups(exercises: Prescription[]) {
     if (exercise.group && exercises.filter((e) => e.group?.id === exercise.group?.id).length < 2)
       exercise.group = undefined;
 }
-function reorderExercise(offset: number) {
-  const next = editIndex.value + offset;
-  if (next < 0 || next >= editExercises.value.length) return;
-  [editExercises.value[editIndex.value], editExercises.value[next]] = [
-    editExercises.value[next]!,
-    editExercises.value[editIndex.value]!,
-  ];
-  editIndex.value = next;
+function reorderExercise(day: Day, index: number, offset: number) {
+  const next = index + offset;
+  const exercises = day.payload.exercises;
+  if (next < 0 || next >= exercises.length) return;
+  [exercises[index], exercises[next]] = [exercises[next]!, exercises[index]!];
 }
 function removeExercise() {
   if (!pickerDay.value || !editExercise.value) return;
@@ -336,15 +333,37 @@ async function save(): Promise<boolean> {
                   <strong>{{ e.sets.length }} × {{ repsSummary(e) }}</strong>
                   {{ e.measurement === 'duration' ? 's' : 'rep' }}
                 </p>
-                <button
-                  type="button"
-                  class="icon-btn builder-edit"
-                  :aria-label="`Modifica serie di ${e.name}`"
-                  title="Modifica serie"
-                  @click="openSetEditor(day, i)"
-                >
-                  <GIcon name="edit" :size="18" />
-                </button>
+                <div class="builder-exercise-actions">
+                  <button
+                    type="button"
+                    class="icon-btn"
+                    :aria-label="`Modifica serie di ${e.name}`"
+                    title="Modifica serie"
+                    @click="openSetEditor(day, i)"
+                  >
+                    <GIcon name="edit" :size="18" />
+                  </button>
+                  <button
+                    type="button"
+                    class="icon-btn"
+                    :aria-label="`Sposta su ${e.name}`"
+                    title="Sposta su"
+                    :disabled="i === 0"
+                    @click="reorderExercise(day, i, -1)"
+                  >
+                    <GIcon name="arrowUp" :size="18" />
+                  </button>
+                  <button
+                    type="button"
+                    class="icon-btn"
+                    :aria-label="`Sposta giù ${e.name}`"
+                    title="Sposta giù"
+                    :disabled="i === day.payload.exercises.length - 1"
+                    @click="reorderExercise(day, i, 1)"
+                  >
+                    <GIcon name="arrowDown" :size="18" />
+                  </button>
+                </div>
               </article>
               <p v-if="!day.payload.exercises.length" class="notice">
                 Premi + per scegliere gli esercizi di questa giornata.
@@ -469,22 +488,6 @@ async function save(): Promise<boolean> {
             <button
               type="button"
               class="secondary"
-              :disabled="editIndex === 0 || !!destinationDayId"
-              @click="reorderExercise(-1)"
-            >
-              Sposta sopra
-            </button>
-            <button
-              type="button"
-              class="secondary"
-              :disabled="editIndex === editExercises.length - 1 || !!destinationDayId"
-              @click="reorderExercise(1)"
-            >
-              Sposta sotto
-            </button>
-            <button
-              type="button"
-              class="secondary"
               :disabled="days.length < 2"
               @click="flowStage = 'destination'"
             >
@@ -585,14 +588,19 @@ async function save(): Promise<boolean> {
   </AppModal>
 </template>
 <style scoped>
-.builder-edit {
-  float: right;
-  margin-top: -36px;
+.builder-exercise-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 6px;
+}
+.builder-exercise-actions .icon-btn {
   color: var(--lime);
   border: 1px solid var(--line);
 }
-.builder-prescription {
-  padding-right: 44px;
+.builder-exercise-actions .icon-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 .builder-set-form .builder-check input {
   width: auto;

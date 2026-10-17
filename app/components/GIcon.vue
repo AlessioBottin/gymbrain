@@ -6,6 +6,8 @@ const paths: Record<string, string> = {
   barbell: 'M3 8v8M6 5v14M18 5v14M21 8v8M6 12h12',
   chart: 'M3 3v18h18M6 15l5-5 4 3 6-8',
   arrow: 'M4 12h16m-6-6 6 6-6 6',
+  arrowUp: 'M12 20V4m-6 6 6-6 6 6',
+  arrowDown: 'M12 4v16m-6-6 6 6 6-6',
   plus: 'M12 5v14M5 12h14',
   edit: 'm16 3 5 5M3 21l5-1L21 7a2 2 0 0 0-5-5L3 15v6Z',
   check: 'm5 12 4 4L19 6',
