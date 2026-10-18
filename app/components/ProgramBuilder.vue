@@ -753,13 +753,8 @@ async function save(): Promise<boolean> {
   background: #8b949722;
 }
 .builder-prescription {
-  font-size: 24px;
-  line-height: 1.3;
-  margin: 12px 0;
-  overflow-wrap: anywhere;
-}
-.builder-prescription strong {
-  font-weight: 800;
+  font-size: 14px;
+  margin: 8px 0;
 }
 
 .builder-exercise-details {
