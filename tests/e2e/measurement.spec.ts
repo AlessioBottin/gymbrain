@@ -6,7 +6,7 @@ test('One recorded set completes a workout; blank sets are excluded and zero is 
   await page.goto('/');
   await page.getByRole('button', { name: 'Prova sul dispositivo' }).click();
   await page.getByRole('button', { name: 'Usa percorso iniziale' }).click();
-  await page.getByRole('button', { name: /Entra in allenamento/ }).click();
+  await page.getByRole('button', { name: /Avvia/ }).click();
   const session = page.getByRole('dialog', { name: /FOCUS MODE/ });
   const reps = session.getByRole('textbox', { name: 'Serie 1 reps', exact: true });
   await reps.fill('0');
@@ -43,7 +43,7 @@ test('An isometric exercise is prescribed and recorded in seconds', async ({ pag
   await editor.getByRole('button', { name: 'Salva sul dispositivo' }).click();
   await expect(editor).not.toBeVisible();
   await page.getByRole('button', { name: 'Oggi', exact: true }).click();
-  await page.getByRole('button', { name: /Entra in allenamento/ }).click();
+  await page.getByRole('button', { name: /Avvia/ }).click();
   const session = page.getByRole('dialog', { name: /FOCUS MODE/ });
   await session.getByRole('button', { name: /4\. Plank/ }).click();
   await expect(session.getByRole('textbox', { name: 'Serie 1 reps', exact: true })).toHaveCount(0);

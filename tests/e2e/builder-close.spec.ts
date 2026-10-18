@@ -1,0 +1,31 @@
+import { test, expect } from '@playwright/test';
+
+test('Builder closes with incomplete drafts and restores them on reopening', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Prova sul dispositivo' }).click();
+  await page.getByRole('button', { name: 'Usa percorso iniziale' }).click();
+  await page.getByRole('button', { name: 'Percorso', exact: true }).click();
+  const open = page.getByRole('button', { name: 'Apri builder scheda' });
+  const builder = page.getByRole('dialog', { name: 'BUILDER DELLA SCHEDA', exact: true });
+  await open.click();
+  const name = builder.locator('.builder-day-name input').first();
+  await name.fill('');
+  await expect(builder.getByRole('alert')).toBeVisible();
+  await builder.getByRole('button', { name: 'Chiudi', exact: true }).click();
+  await expect(builder).not.toBeVisible();
+  await open.click();
+  await expect(name).toHaveValue('');
+  await page.keyboard.press('Escape');
+  await expect(builder).not.toBeVisible();
+  await page.reload();
+  await page.getByRole('button', { name: 'Percorso', exact: true }).click();
+  await open.click();
+  await expect(name).toHaveValue('');
+  await name.fill('Upper body corrected');
+  await builder.getByRole('button', { name: 'Chiudi', exact: true }).click();
+  await expect(builder).not.toBeVisible();
+  await open.click();
+  await expect(name).toHaveValue('Upper body corrected');
+  await builder.getByRole('button', { name: 'Chiudi', exact: true }).click();
+  await expect(builder).not.toBeVisible();
+});

@@ -26,7 +26,7 @@ test('Slow decimal input survives timer ticks, persists on commit, mobile sessio
   await page.goto('/');
   await page.getByRole('button', { name: 'Prova sul dispositivo' }).click();
   await page.getByRole('button', { name: 'Usa percorso iniziale' }).click();
-  await page.getByRole('button', { name: 'Entra in allenamento' }).click();
+  await page.getByRole('button', { name: 'Avvia' }).click();
   const dialog = page.getByRole('dialog', { name: /FOCUS MODE/ }),
     load = dialog.getByRole('textbox', { name: 'Serie 1 load', exact: true });
   await load.fill('12,');

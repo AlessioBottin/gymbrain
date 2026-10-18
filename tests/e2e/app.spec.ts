@@ -14,7 +14,7 @@ test('Chrome desktop: create a plan, log a session, reload offline and finish wi
     fullPage: true,
     animations: 'disabled',
   })
-  await page.getByRole('button', { name: 'Entra in allenamento' }).click()
+  await page.getByRole('button', { name: 'Avvia' }).click()
   const session = page.getByRole('dialog', { name: 'FOCUS MODE · IL TUO ALLENAMENTO', exact: true })
   await session.getByRole('textbox', { name: 'Serie 1 reps', exact: true }).fill('6')
   await session.getByRole('textbox', { name: 'Serie 1 load', exact: true }).fill('12.5')

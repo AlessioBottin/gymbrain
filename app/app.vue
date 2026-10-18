@@ -966,12 +966,7 @@ const date = (value: string) =>
                           {{ workoutData.exercises.reduce((n, e) => n + e.sets.length, 0) }}
                           serie</span
                         ><button class="primary" @click="start">
-                          <span
-                            ><span lang="la">{{ ongoing ? 'Perge' : 'Incipe' }}</span
-                            ><small class="cta-translation">{{
-                              ongoing ? 'Riprendi sessione' : 'Entra in allenamento'
-                            }}</small></span
-                          >
+                          <span>{{ ongoing ? 'Riprendi sessione' : 'Avvia' }}</span>
                           <GIcon name="arrow" />
                         </button>
                       </div>
@@ -1298,6 +1293,7 @@ const date = (value: string) =>
       :workouts="workouts"
       :catalog="catalog"
       @close="builderOpen = false"
+      @draft-kept="notify('Bozza conservata sul dispositivo. Puoi riaprire il builder per completarla.')"
       @saved="sync"
     />
     <RecordEditor

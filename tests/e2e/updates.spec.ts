@@ -56,7 +56,7 @@ test('PWA updates automatically across tabs, defers workout reload and retains o
     await page.goto(url)
     await page.getByRole('button', { name: 'Prova sul dispositivo' }).click()
     await page.getByRole('button', { name: 'Usa percorso iniziale' }).click()
-    await page.getByRole('button', { name: 'Entra in allenamento' }).click()
+    await page.getByRole('button', { name: 'Avvia' }).click()
     const session = page.getByRole('dialog', {
       name: 'FOCUS MODE · IL TUO ALLENAMENTO',
       exact: true,

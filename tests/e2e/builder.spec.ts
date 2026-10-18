@@ -180,7 +180,7 @@ test('Builder: personal targets, multiple days, volume, offline draft and sessio
   await expect(builder).not.toBeVisible();
   await expect(page.getByRole('button', { name: 'Avvia selezionati' })).toHaveCount(0);
   await page.locator('.days .day').filter({ hasText: 'Lunedì' }).click();
-  await page.getByRole('button', { name: 'Entra in allenamento' }).click();
+  await page.getByRole('button', { name: 'Avvia' }).click();
   const session = page.getByRole('dialog', { name: 'FOCUS MODE · IL TUO ALLENAMENTO', exact: true });
   await expect(session).toBeVisible();
   await session.getByRole('button', { name: 'Chiudi', exact: true }).click();
@@ -236,7 +236,7 @@ test('Desktop overview and a cluster inside a superset guide execution and prese
   await expect(a.locator('.builder-prescription')).toContainText('1 × 6+6');
   await builder.getByRole('button', { name: 'Chiudi', exact: true }).click();
   await expect(builder).not.toBeVisible();
-  await page.getByRole('button', { name: 'Entra in allenamento' }).click();
+  await page.getByRole('button', { name: 'Avvia' }).click();
   const session = page.getByRole('dialog', { name: 'FOCUS MODE · IL TUO ALLENAMENTO', exact: true });
   const cluster = session
     .locator('fieldset')
@@ -314,6 +314,7 @@ test('Current mesocycle is displayed by default after reopening, with manual sel
     .click();
   await expect(builder.locator('.builder-day').first().locator('.builder-exercise')).toHaveCount(1);
   await builder.getByRole('button', { name: 'Chiudi', exact: true }).click();
+  await expect(builder).not.toBeVisible();
   await page.reload();
   await expect(page.locator('.exercise-row')).toHaveCount(1);
   await page.getByRole('button', { name: 'Esercizi', exact: true }).click();

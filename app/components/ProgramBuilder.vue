@@ -17,7 +17,7 @@ const props = defineProps<{
   workouts: LocalRecord[];
   catalog: LocalRecord[];
 }>();
-const emit = defineEmits<{ close: []; saved: [] }>();
+const emit = defineEmits<{ close: []; saved: []; draftKept: [] }>();
 type Day = { id: string; revision?: number; payload: Workout };
 const days = ref<Day[]>([]),
   saving = ref(false),
@@ -149,8 +149,10 @@ const saveStatus = computed(() =>
 function persistDraft() {
   try {
     localStorage.setItem(key.value, JSON.stringify(days.value));
+    return true;
   } catch {
     error.value = 'Spazio locale non disponibile.';
+    return false;
   }
 }
 watch(content, () => {
@@ -166,7 +168,14 @@ onBeforeUnmount(() => clearTimeout(saveTimer));
 async function closeBuilder() {
   clearTimeout(saveTimer);
   if (pendingSave) await pendingSave;
-  if (await save()) emit('close');
+  if (await save()) {
+    clearTimeout(saveTimer);
+    emit('close');
+  } else if (persistDraft()) {
+    clearTimeout(saveTimer);
+    emit('draftKept');
+    emit('close');
+  }
 }
 function resetDraft() {
   days.value = props.workouts.map((r) => ({
