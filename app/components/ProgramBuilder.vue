@@ -203,12 +203,13 @@ function reorderExercise(day: Day, index: number, offset: number) {
   if (next < 0 || next >= exercises.length) return;
   [exercises[index], exercises[next]] = [exercises[next]!, exercises[index]!];
 }
+function removeFromDay(day: Day, exerciseId: string) {
+  day.payload.exercises = day.payload.exercises.filter((e) => e.id !== exerciseId);
+  clearOrphanGroups(day.payload.exercises);
+}
 function removeExercise() {
   if (!pickerDay.value || !editExercise.value) return;
-  pickerDay.value.payload.exercises = pickerDay.value.payload.exercises.filter(
-    (e) => e.id !== editExercise.value!.id,
-  );
-  clearOrphanGroups(pickerDay.value.payload.exercises);
+  removeFromDay(pickerDay.value, editExercise.value.id);
   pickerDayId.value = '';
 }
 function setCount(e: Prescription, event: Event) {
@@ -362,6 +363,15 @@ async function save(): Promise<boolean> {
                     @click="reorderExercise(day, i, 1)"
                   >
                     <GIcon name="arrowDown" :size="18" />
+                  </button>
+                  <button
+                    type="button"
+                    class="icon-btn danger"
+                    :aria-label="`Rimuovi ${e.name} dalla giornata`"
+                    title="Rimuovi dalla giornata"
+                    @click="removeFromDay(day, e.id)"
+                  >
+                    <GIcon name="trash" :size="18" />
                   </button>
                 </div>
               </article>
@@ -742,9 +752,15 @@ async function save(): Promise<boolean> {
   background: #8b949722;
 }
 .builder-prescription {
-  font-size: 14px;
-  margin: 8px 0;
+  font-size: 24px;
+  line-height: 1.3;
+  margin: 12px 0;
+  overflow-wrap: anywhere;
 }
+.builder-prescription strong {
+  font-weight: 800;
+}
+
 .builder-exercise-details {
   margin-top: 10px;
   font-size: 12px;

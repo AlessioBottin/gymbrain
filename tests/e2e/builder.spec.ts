@@ -283,4 +283,20 @@ test('Current mesocycle is displayed by default after reopening, with manual sel
     fullPage: true,
     animations: 'disabled',
   });
+  await page.getByRole('button', { name: 'Rimuovi Pull-up dalla giornata', exact: true }).click();
+  await expect(page.locator('.exercise-row')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Apri builder scheda' }).click();
+  const builder = page.getByRole('dialog', { name: 'BUILDER DELLA SCHEDA' });
+  await builder
+    .locator('.builder-day')
+    .first()
+    .getByRole('button', { name: 'Rimuovi Dip alle parallele dalla giornata', exact: true })
+    .click();
+  await expect(builder.locator('.builder-day').first().locator('.builder-exercise')).toHaveCount(1);
+  await builder.getByRole('button', { name: 'Chiudi', exact: true }).click();
+  await page.reload();
+  await expect(page.locator('.exercise-row')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Esercizi', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Pull-up', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Dip alle parallele', exact: true })).toBeVisible();
 });

@@ -371,6 +371,28 @@ watch(
     builderOpen.value = false;
   },
 );
+async function removeWorkoutExercise(exerciseId: string) {
+  if (!workout.value || busy.value) return;
+  const row = workout.value;
+  const payload = JSON.parse(JSON.stringify(row.payload)) as Workout;
+  payload.exercises = payload.exercises.filter((e) => e.id !== exerciseId);
+  for (const exercise of payload.exercises)
+    if (exercise.group && payload.exercises.filter((e) => e.group?.id === exercise.group?.id).length < 2)
+      exercise.group = undefined;
+  busy.value = true;
+  try {
+    await saveRecord(owner.value, 'workout', payload, {
+      id: row.id,
+      parentId: row.parent_id,
+      expectedRevision: row.localRevision,
+    });
+    void sync();
+  } catch (e) {
+    notify(e instanceof Error ? e.message : String(e));
+  } finally {
+    busy.value = false;
+  }
+}
 async function start() {
   try {
     if (ongoing.value) {
@@ -916,7 +938,7 @@ const date = (value: string) =>
                             }}{{ e.band ? ' / ' + e.band : '' }}</small
                           ><small v-if="e.notes">{{ e.notes }}</small>
                         </div>
-                        <span
+                        <span class="exercise-prescription"
                           >{{ e.sets.length }} ×
                           {{
                             e.sets
@@ -926,6 +948,17 @@ const date = (value: string) =>
                           }}
                           {{ e.measurement === 'duration' ? 's' : 'rep' }}</span
                         >
+                        <button
+                          v-if="view === 'percorso'"
+                          type="button"
+                          class="icon-btn danger"
+                          :aria-label="`Rimuovi ${e.name} dalla giornata`"
+                          title="Rimuovi dalla giornata"
+                          :disabled="busy"
+                          @click="removeWorkoutExercise(e.id)"
+                        >
+                          <GIcon name="trash" :size="18" />
+                        </button>
                       </div>
                       <div class="workout-action">
                         <span class="subtle"
