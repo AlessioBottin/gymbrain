@@ -383,7 +383,7 @@ async function save(): Promise<boolean> {
         </div>
         <section class="builder-recap" aria-label="Volume totale della scheda">
           <h3>Recap scheda</h3>
-          <VolumeSummary :exercises="allExercises" :catalog="catalog" />
+          <VolumeSummary :exercises="allExercises" :catalog="catalog" expanded />
           <p class="notice">
             I target non impostati nel catalogo contano 0. Cluster e drop contano una serie per tutti i
             passaggi.

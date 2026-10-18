@@ -3,6 +3,8 @@ import {
   newTarget,
   exerciseSchema,
   workoutSchema,
+  variantSchema,
+  type MuscleTargets,
   type LocalRecord,
   type Prescription,
   type Exercise,
@@ -27,6 +29,35 @@ const selectedVariantId = ref('');
 const selectedVariant = computed(
   () => draft.value.variants?.find((v: any) => v.id === selectedVariantId.value) || draft.value.variants?.[0],
 );
+const variantDraft = ref<Exercise['variants'][number]>();
+const variantError = ref('');
+const targetsOpen = ref(false);
+const targetDraft = ref<MuscleTargets>({});
+function editVariant() {
+  if (!selectedVariant.value) return;
+  variantDraft.value = JSON.parse(JSON.stringify(selectedVariant.value));
+  variantError.value = '';
+}
+function confirmVariant() {
+  const result = variantSchema.safeParse(variantDraft.value);
+  if (!result.success) {
+    variantError.value = 'Controlla il nome e i dati della variante.';
+    return;
+  }
+  const index = draft.value.variants.findIndex((v: any) => v.id === result.data.id);
+  if (index < 0) draft.value.variants.push(result.data);
+  else draft.value.variants[index] = result.data;
+  selectedVariantId.value = result.data.id;
+  variantDraft.value = undefined;
+}
+function openTargets() {
+  targetDraft.value = { ...variantDraft.value?.muscleTargets };
+  targetsOpen.value = true;
+}
+function confirmTargets() {
+  if (variantDraft.value) variantDraft.value.muscleTargets = { ...targetDraft.value };
+  targetsOpen.value = false;
+}
 const prescriptions = computed(() => draft.value.exercises as Prescription[]);
 const draftKey = computed(
   () => `gymbrain-draft:${props.owner}:${props.kind}:${props.record?.id || props.parentId || 'new'}`,
@@ -60,6 +91,8 @@ const modes = [
 watch(
   () => props.open,
   (value) => {
+    variantDraft.value = undefined;
+    targetsOpen.value = false;
     if (!value) return;
     error.value = '';
     selectedExercise.value = '';
@@ -134,9 +167,8 @@ function addExercise() {
   selectedExercise.value = '';
 }
 function addVariant() {
-  const id = crypto.randomUUID();
-  draft.value.variants.push({ id, name: '', notes: '' });
-  selectedVariantId.value = id;
+  variantDraft.value = { id: crypto.randomUUID(), name: '', notes: '' };
+  variantError.value = '';
 }
 function variantsFor(id: string) {
   return (props.catalog.find((r) => r.id === id)?.payload as Exercise | undefined)?.variants || [];
@@ -160,6 +192,7 @@ function submit() {
     const incomplete = draft.value.variants.find((v: any) => !v.name.trim());
     if (incomplete) {
       selectedVariantId.value = incomplete.id;
+      editVariant();
       error.value = 'Inserisci il nome della variante selezionata.';
       return;
     }
@@ -246,35 +279,33 @@ function clean(set: any, key: string, event: Event) {
           <fieldset class="assistance-picker">
             <legend>Varianti del movimento</legend>
             <p class="notice">Per esempio HSPU con variante Deep. Il sovraccarico si imposta nella scheda.</p>
-            <label v-if="draft.variants.length"
-              >Variante da modificare
-              <select
-                :value="selectedVariant?.id || ''"
-                @change="selectedVariantId = ($event.target as HTMLSelectElement).value"
-              >
-                <option v-for="(variant, i) in draft.variants" :key="variant.id" :value="variant.id">
-                  {{ variant.name || 'Nuova variante ' + (Number(i) + 1) }}
-                </option>
-              </select>
-            </label>
-            <div v-if="selectedVariant" :key="selectedVariant.id" class="variant-editor">
+            <div v-if="draft.variants.length" class="variant-selection">
               <label
-                >Nome variante<input
-                  v-model="selectedVariant.name"
-                  required
-                  maxlength="100"
-                  placeholder="Deep / profondo"
-              /></label>
-              <MuscleTargets v-model="selectedVariant.muscleTargets" :inherited="draft.muscleTargets || {}" />
-              <label
-                >Note variante<textarea v-model="selectedVariant.notes" maxlength="4000" rows="2" />
+                >Variante da modificare
+                <select
+                  :value="selectedVariant?.id || ''"
+                  @change="selectedVariantId = ($event.target as HTMLSelectElement).value"
+                >
+                  <option v-for="(variant, i) in draft.variants" :key="variant.id" :value="variant.id">
+                    {{ variant.name || 'Nuova variante ' + (Number(i) + 1) }}
+                  </option>
+                </select>
               </label>
               <button
                 type="button"
+                class="icon-btn"
+                aria-label="Modifica variante"
+                title="Modifica variante"
+                @click="editVariant"
+              >
+                <GIcon name="edit" :size="18" />
+              </button>
+              <button
+                type="button"
                 class="icon-btn danger"
-                @click="draft.variants = draft.variants.filter((v: any) => v.id !== selectedVariant.id)"
                 aria-label="Rimuovi variante"
                 title="Rimuovi variante"
+                @click="draft.variants = draft.variants.filter((v: any) => v.id !== selectedVariant?.id)"
               >
                 <GIcon name="trash" :size="18" />
               </button>
@@ -499,4 +530,70 @@ function clean(set: any, key: string, event: Event) {
         Salva sul dispositivo <GIcon name="check" />
       </button></form
   ></AppModal>
+  <AppModal :open="open && !!variantDraft" title="VARIANTE DEL MOVIMENTO" @close="variantDraft = undefined">
+    <form v-if="variantDraft" @submit.prevent="confirmVariant">
+      <label
+        >Nome variante<input
+          v-model="variantDraft.name"
+          required
+          maxlength="100"
+          placeholder="Deep / profondo"
+      /></label>
+      <label>Note variante<textarea v-model="variantDraft.notes" maxlength="4000" rows="2" /></label>
+      <button type="button" class="secondary variant-target-button" @click="openTargets">
+        <GIcon name="edit" :size="14" /> Target muscolari
+      </button>
+      <p v-if="variantError" role="alert">{{ variantError }}</p>
+      <div class="button-group variant-dialog-actions">
+        <button type="button" class="secondary" @click="variantDraft = undefined">Annulla</button>
+        <button type="submit" class="primary">Conferma variante</button>
+      </div>
+    </form>
+  </AppModal>
+  <AppModal
+    :open="open && !!variantDraft && targetsOpen"
+    title="TARGET DELLA VARIANTE"
+    @close="targetsOpen = false"
+  >
+    <template v-if="variantDraft">
+      <h2>{{ variantDraft.name || 'Nuova variante' }}</h2>
+      <MuscleTargets v-model="targetDraft" :inherited="draft.muscleTargets || {}" expanded />
+      <div class="button-group variant-dialog-actions">
+        <button type="button" class="secondary" @click="targetsOpen = false">Annulla</button>
+        <button type="button" class="primary" @click="confirmTargets">Conferma target</button>
+      </div>
+    </template>
+  </AppModal>
 </template>
+
+<style scoped>
+.variant-selection {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.variant-selection label {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+.variant-selection select {
+  margin-bottom: 0;
+}
+.variant-selection .icon-btn {
+  width: 44px;
+  height: 44px;
+}
+.variant-target-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  min-height: 32px;
+  padding: 6px 10px;
+}
+.variant-dialog-actions {
+  margin-top: 20px;
+}
+</style>

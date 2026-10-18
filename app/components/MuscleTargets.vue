@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { muscleGroups, type MuscleTargets, type Muscle } from '../../shared/domain';
-const props = defineProps<{ modelValue?: MuscleTargets; inherited?: MuscleTargets }>();
+const props = defineProps<{ modelValue?: MuscleTargets; inherited?: MuscleTargets; expanded?: boolean }>();
 const emit = defineEmits<{ 'update:modelValue': [value: MuscleTargets] }>();
 const muscles = Object.keys(muscleGroups) as Muscle[];
 const effective = (m: Muscle) => props.modelValue?.[m] ?? props.inherited?.[m] ?? 0;
@@ -21,8 +21,8 @@ function change(m: Muscle, event: Event) {
 }
 </script>
 <template>
-  <details class="muscle-targets">
-    <summary>
+  <component :is="expanded ? 'div' : 'details'" class="muscle-targets">
+    <summary v-if="!expanded">
       {{ inherited ? 'Target variante (eredita se vuoto)' : 'La tua filosofia: target muscolari' }}
     </summary>
     <p class="notice">Ogni serie conta da 0 a 1 per ciascun muscolo. I coefficienti sono personali.</p>
@@ -47,5 +47,5 @@ function change(m: Muscle, event: Event) {
         </select>
       </label>
     </div>
-  </details>
+  </component>
 </template>

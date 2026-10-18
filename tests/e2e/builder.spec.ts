@@ -18,16 +18,36 @@ test('Builder: personal targets, multiple days, volume, offline draft and sessio
   await expect(editor.getByRole('combobox', { name: 'Tricipiti', exact: true })).toHaveCount(0);
   await editor.getByRole('combobox', { name: 'Aggiungi gruppo muscolare' }).selectOption('triceps');
   await editor.getByRole('combobox', { name: 'Tricipiti', exact: true }).selectOption('0.5');
-  await editor.getByRole('button', { name: 'Aggiungi variante +' }).click();
-  await editor.getByLabel('Nome variante', { exact: true }).fill('Deep');
-  await editor.getByRole('button', { name: 'Aggiungi variante +' }).click();
-  await editor.getByLabel('Nome variante', { exact: true }).fill('Wide');
-  await expect(editor.getByLabel('Nome variante', { exact: true })).toHaveCount(1);
+  const variantEditor = page.getByRole('dialog', { name: 'VARIANTE DEL MOVIMENTO', exact: true });
+  for (const name of ['Deep', 'Wide']) {
+    await editor.getByRole('button', { name: 'Aggiungi variante +' }).click();
+    await variantEditor.getByLabel('Nome variante', { exact: true }).fill(name);
+    await variantEditor.getByRole('button', { name: 'Conferma variante', exact: true }).click();
+  }
+  await expect(editor.getByLabel('Nome variante', { exact: true })).toHaveCount(0);
   await editor
     .getByRole('combobox', { name: 'Variante da modificare', exact: true })
     .selectOption({ label: 'Deep' });
-  await expect(editor.getByLabel('Nome variante', { exact: true })).toHaveValue('Deep');
-
+  await editor.getByRole('button', { name: 'Modifica variante', exact: true }).click();
+  await expect(variantEditor.getByLabel('Nome variante', { exact: true })).toHaveValue('Deep');
+  await variantEditor.getByRole('button', { name: 'Target muscolari', exact: true }).click();
+  const targetEditor = page.getByRole('dialog', { name: 'TARGET DELLA VARIANTE', exact: true });
+  await expect(targetEditor.locator('summary')).toHaveCount(0);
+  await targetEditor.getByRole('combobox', { name: 'Tricipiti', exact: true }).selectOption('0');
+  await expect(targetEditor.getByRole('combobox', { name: 'Tricipiti', exact: true })).toHaveCount(0);
+  await targetEditor.getByRole('button', { name: 'Annulla', exact: true }).click();
+  await variantEditor.getByRole('button', { name: 'Target muscolari', exact: true }).click();
+  await expect(targetEditor.getByRole('combobox', { name: 'Tricipiti', exact: true })).toHaveValue('');
+  await targetEditor.getByRole('combobox', { name: 'Tricipiti', exact: true }).selectOption('0.5');
+  await page.screenshot({ path: 'preview-artifacts/variant-targets.png', animations: 'disabled' });
+  await targetEditor.getByRole('button', { name: 'Conferma target', exact: true }).click();
+  await variantEditor.getByRole('button', { name: 'Conferma variante', exact: true }).click();
+  await editor.getByRole('button', { name: 'Modifica variante', exact: true }).click();
+  await variantEditor.getByLabel('Nome variante', { exact: true }).fill('Cancelled name');
+  await variantEditor.getByRole('button', { name: 'Annulla', exact: true }).click();
+  await expect(
+    editor.getByRole('combobox', { name: 'Variante da modificare', exact: true }).locator('option:checked'),
+  ).toHaveText('Deep');
   await editor.getByRole('button', { name: 'Salva sul dispositivo' }).click();
   await expect(editor).not.toBeVisible();
   await page.getByRole('button', { name: 'Percorso', exact: true }).click();
