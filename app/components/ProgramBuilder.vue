@@ -713,7 +713,8 @@ async function save(): Promise<boolean> {
 .builder-days {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(190px, 1fr);
+  grid-auto-columns: minmax(190px, 320px);
+  justify-content: start;
   gap: 12px;
   align-items: start;
   margin: 16px 0;
@@ -803,7 +804,7 @@ async function save(): Promise<boolean> {
 }
 @media (max-width: 760px) {
   .builder-days {
-    grid-auto-columns: minmax(240px, 80vw);
+    grid-auto-columns: minmax(240px, min(320px, 80vw));
   }
   .builder-recap :deep(.muscle-grid) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
