@@ -938,7 +938,7 @@ const date = (value: string) =>
                             }}{{ e.band ? ' / ' + e.band : '' }}</small
                           ><small v-if="e.notes">{{ e.notes }}</small>
                         </div>
-                        <span class="exercise-prescription"
+                        <span
                           >{{ e.sets.length }} ×
                           {{
                             e.sets
