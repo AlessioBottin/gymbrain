@@ -112,6 +112,8 @@ function applyExerciseSettings() {
 const weekdays = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 const key = computed(() => `gymbrain-draft:${props.owner}:builder:${props.plan.id}`);
 const allExercises = computed(() => days.value.flatMap((d) => d.payload.exercises));
+const content = computed(() => JSON.stringify(days.value.map(({ id, payload }) => ({ id, payload }))));
+const savedContent = ref('');
 watch(
   () => props.open,
   (value) => {
@@ -132,9 +134,8 @@ watch(
       error.value = 'Bozza non leggibile. Sono disponibili le giornate salvate.';
     }
   },
+  { immediate: true },
 );
-const content = computed(() => JSON.stringify(days.value.map(({ id, payload }) => ({ id, payload }))));
-const savedContent = ref('');
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let pendingSave: Promise<boolean> | undefined;
 const saveStatus = computed(() =>

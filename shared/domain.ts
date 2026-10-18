@@ -48,7 +48,8 @@ export const muscleGroups = {
   traps: 'Trapezi',
   biceps: 'Bicipiti',
   triceps: 'Tricipiti',
-  frontSideDelts: 'Deltoidi laterali e frontali',
+  frontDelts: 'Deltoidi frontali',
+  sideDelts: 'Deltoidi laterali',
   forearms: 'Avambracci',
   abs: 'Addominali',
   obliques: 'Obliqui (core)',
@@ -56,13 +57,25 @@ export const muscleGroups = {
   adductors: 'Adduttori',
 } as const;
 export type Muscle = keyof typeof muscleGroups;
-export const muscleTargetsSchema = z.partialRecord(
-  z.enum(Object.keys(muscleGroups) as [Muscle, ...Muscle[]]),
-  z
-    .number()
-    .min(0)
-    .max(1)
-    .refine((v) => Math.abs(v * 10 - Math.round(v * 10)) < 1e-9, 'Usa un solo decimale'),
+export function normalizeMuscleTargets(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+  const { frontSideDelts, ...targets } = value as Record<string, unknown>;
+  if (frontSideDelts !== undefined) {
+    if (targets.frontDelts === undefined) targets.frontDelts = frontSideDelts;
+    if (targets.sideDelts === undefined) targets.sideDelts = frontSideDelts;
+  }
+  return targets;
+}
+export const muscleTargetsSchema = z.preprocess(
+  normalizeMuscleTargets,
+  z.partialRecord(
+    z.enum(Object.keys(muscleGroups) as [Muscle, ...Muscle[]]),
+    z
+      .number()
+      .min(0)
+      .max(1)
+      .refine((v) => Math.abs(v * 10 - Math.round(v * 10)) < 1e-9, 'Usa un solo decimale'),
+  ),
 );
 export type MuscleTargets = z.infer<typeof muscleTargetsSchema>;
 export const variantSchema = z

@@ -18,6 +18,13 @@ test('Builder: personal targets, multiple days, volume, offline draft and sessio
   await expect(editor.getByRole('combobox', { name: 'Tricipiti', exact: true })).toHaveCount(0);
   await editor.getByRole('combobox', { name: 'Aggiungi gruppo muscolare' }).selectOption('triceps');
   await editor.getByRole('combobox', { name: 'Tricipiti', exact: true }).selectOption('0.5');
+  await editor.getByRole('combobox', { name: 'Aggiungi gruppo muscolare' }).selectOption('frontDelts');
+  await editor.getByRole('combobox', { name: 'Deltoidi frontali', exact: true }).selectOption('0.7');
+  await editor.getByRole('combobox', { name: 'Aggiungi gruppo muscolare' }).selectOption('sideDelts');
+  await editor.getByRole('combobox', { name: 'Deltoidi laterali', exact: true }).selectOption('0.3');
+  await expect(editor.getByRole('combobox', { name: 'Petto', exact: true })).toHaveValue('1');
+  await expect(editor.getByRole('combobox', { name: 'Deltoidi frontali', exact: true })).toHaveValue('0.7');
+
   const variantEditor = page.getByRole('dialog', { name: 'VARIANTE DEL MOVIMENTO', exact: true });
   for (const name of ['Deep', 'Wide']) {
     await editor.getByRole('button', { name: 'Aggiungi variante +' }).click();
@@ -275,6 +282,16 @@ test('Current mesocycle is displayed by default after reopening, with manual sel
   const select = page.getByRole('combobox', { name: 'Mesociclo', exact: true });
   await select.selectOption({ label: 'Archivio passato' });
   await expect(select.locator('option:checked')).toHaveText('Archivio passato');
+  await page.getByRole('button', { name: 'Nuova scheda', exact: true }).click();
+  await editor.getByLabel('Nome', { exact: true }).fill('Scheda archivio');
+  await editor.getByRole('button', { name: 'Salva sul dispositivo' }).click();
+  await page.getByRole('button', { name: 'Apri builder scheda' }).click();
+  const archivedBuilder = page.getByRole('dialog', { name: 'BUILDER DELLA SCHEDA' });
+  await expect(archivedBuilder.getByRole('heading', { name: 'Scheda archivio', exact: true })).toBeVisible();
+  await expect(archivedBuilder.locator('.builder-day')).toHaveCount(0);
+  await archivedBuilder.getByRole('button', { name: 'Chiudi', exact: true }).click();
+  await expect(archivedBuilder).not.toBeVisible();
+
   await page.reload();
   await expect(page.locator('.hero h2')).toHaveText('Forza, sotto controllo.');
   await page.getByRole('button', { name: 'Percorso', exact: true }).click();
@@ -285,6 +302,22 @@ test('Current mesocycle is displayed by default after reopening, with manual sel
   await editor.getByLabel('Fine periodo').fill('2020-02-01');
   await editor.getByRole('button', { name: 'Salva sul dispositivo' }).click();
   await page.getByRole('button', { name: 'Seleziona scheda Scheda passata', exact: true }).click();
+  await page.getByRole('button', { name: 'Apri builder scheda' }).click();
+  const pastBuilder = page.getByRole('dialog', { name: 'BUILDER DELLA SCHEDA' });
+  await expect(pastBuilder.locator('.builder-day')).toHaveCount(0);
+  await pastBuilder.getByRole('button', { name: 'Chiudi', exact: true }).click();
+  await expect(pastBuilder).not.toBeVisible();
+  await page.getByRole('button', { name: 'Seleziona scheda Accumulo', exact: true }).click();
+  await page.getByRole('button', { name: 'Apri builder scheda' }).click();
+  await expect(pastBuilder.locator('.builder-day')).toHaveCount(3);
+  await pastBuilder.getByRole('button', { name: 'Chiudi', exact: true }).click();
+  await expect(pastBuilder).not.toBeVisible();
+  await page.getByRole('button', { name: 'Seleziona scheda Scheda passata', exact: true }).click();
+  await page.getByRole('button', { name: 'Apri builder scheda' }).click();
+  await expect(pastBuilder.locator('.builder-day')).toHaveCount(0);
+  await pastBuilder.getByRole('button', { name: 'Chiudi', exact: true }).click();
+  await expect(pastBuilder).not.toBeVisible();
+
   await page.reload();
   await page.getByRole('button', { name: 'Percorso', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Seleziona scheda Accumulo', exact: true })).toHaveAttribute(

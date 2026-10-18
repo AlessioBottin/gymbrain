@@ -1,5 +1,6 @@
 import {
   muscleGroups,
+  normalizeMuscleTargets,
   newTarget,
   type Muscle,
   type MuscleTargets,
@@ -9,7 +10,10 @@ import {
 } from './domain.ts';
 
 export function effectiveTargets(base: MuscleTargets = {}, overrides: MuscleTargets = {}): MuscleTargets {
-  return { ...base, ...overrides };
+  return {
+    ...(normalizeMuscleTargets(base) as MuscleTargets),
+    ...(normalizeMuscleTargets(overrides) as MuscleTargets),
+  };
 }
 export function prescriptionTargets(e: Prescription, catalog: LocalRecord[] = []): MuscleTargets {
   const source = catalog.find((r) => r.id === e.exerciseId)?.payload as Exercise | undefined;

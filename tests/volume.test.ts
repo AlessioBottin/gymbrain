@@ -33,12 +33,13 @@ test('Personal coefficients accept tenths including zero, reject unsupported gro
 });
 test('Push up + HSPU: two sets chest, shoulders and triceps; warmup excluded', () => {
   const push = makePrescription(exercise('Push up', { chest: 1, triceps: 0.5 }));
-  const hspu = makePrescription(exercise('HSPU', { frontSideDelts: 1, triceps: 0.5 }));
+  const hspu = makePrescription(exercise('HSPU', { frontDelts: 1, sideDelts: 0.3, triceps: 0.5 }));
   push.sets.push({ ...push.sets[0]! });
   hspu.sets.push({ ...hspu.sets[0]! });
   const total = volume([push, hspu]);
   assert.equal(total.chest, 2);
-  assert.equal(total.frontSideDelts, 2);
+  assert.equal(total.frontDelts, 2);
+  assert.equal(total.sideDelts, 0.6);
   assert.equal(total.triceps, 2);
   push.sets[0]!.countVolume = false;
   assert.equal(volume([push, hspu]).triceps, 1.5);
@@ -103,4 +104,23 @@ test('Builder commits all days and outbox entries atomically, rolls back on stal
   assert.equal((await db.records.get([owner, fresh]))!.payload.notes, 'Autosaved again');
   const session = snapshotSession(day, null);
   assert.equal(session.exercises[0]!.muscleTargets?.chest, 1);
+});
+
+test('Legacy deltoid targets split without overwriting explicit targets or variant zero overrides', () => {
+  assert.deepEqual(muscleTargetsSchema.parse({ frontSideDelts: 0.5, frontDelts: 1 }), {
+    frontDelts: 1,
+    sideDelts: 0.5,
+  });
+  assert.deepEqual(effectiveTargets({ frontSideDelts: 0.5 } as any, { sideDelts: 0 }), {
+    frontDelts: 0.5,
+    sideDelts: 0,
+  });
+  assert.deepEqual(effectiveTargets({ frontDelts: 1, sideDelts: 1 }, { frontSideDelts: 0 } as any), {
+    frontDelts: 0,
+    sideDelts: 0,
+  });
+  const p = makePrescription(exercise('Legacy', {}));
+  p.muscleTargets = { frontSideDelts: 0.5 } as any;
+  assert.equal(volume([p]).frontDelts, 0.5);
+  assert.equal(volume([p]).sideDelts, 0.5);
 });

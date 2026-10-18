@@ -1,4 +1,4 @@
-import type { LocalRecord } from './domain';
+import type { LocalRecord } from './domain.ts';
 
 export function activeCycle(cycles: LocalRecord[], today: string): LocalRecord | undefined {
   const date = Date.parse(today);

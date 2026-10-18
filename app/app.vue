@@ -50,7 +50,18 @@ const rows = ref<LocalRecord[]>([]),
   workoutId = ref(''),
   sessionRecord = ref<LocalRecord | null>(null),
   focusMode = ref(false),
-  builderOpen = ref(false);
+  builderOpen = ref(false),
+  builderPlan = ref<LocalRecord | null>(null);
+function openBuilder() {
+  if (!plan.value) return;
+  builderPlan.value = plan.value;
+  builderOpen.value = true;
+}
+const builderWorkouts = computed(() =>
+  rows.value
+    .filter((r) => r.kind === 'workout' && r.parent_id === builderPlan.value?.id && !r.deleted)
+    .sort((a, b) => (a.payload as Workout).order - (b.payload as Workout).order),
+);
 const withings = useWithings(auth, owner, local, online, sync);
 const whoop = useWhoop(auth, owner, local, online);
 useImmersiveMotion();
@@ -229,6 +240,8 @@ async function sync() {
 }
 async function observeOwner() {
   editor.open = false;
+  builderOpen.value = false;
+  builderPlan.value = null;
   unsubscribe?.();
   rows.value = [];
   pending.value = 0;
@@ -889,7 +902,7 @@ const date = (value: string) =>
                     <p v-if="plan && (plan.payload as any).start" class="subtle">
                       Periodo: {{ date((plan.payload as any).start) }} – {{ date((plan.payload as any).end) }}
                     </p>
-                    <button v-if="plan && view === 'percorso'" class="secondary" @click="builderOpen = true">
+                    <button v-if="plan && view === 'percorso'" class="secondary" @click="openBuilder">
                       Apri builder scheda
                     </button>
 
@@ -1286,11 +1299,12 @@ const date = (value: string) =>
       <p role="status">{{ whoop.message.value }}</p>
     </AppModal>
     <ProgramBuilder
-      v-if="plan"
+      v-if="builderPlan"
+      :key="builderPlan.id"
       :open="builderOpen"
       :owner="owner"
-      :plan="plan"
-      :workouts="workouts"
+      :plan="builderPlan"
+      :workouts="builderWorkouts"
       :catalog="catalog"
       @close="builderOpen = false"
       @draft-kept="notify('Bozza conservata sul dispositivo. Puoi riaprire il builder per completarla.')"
