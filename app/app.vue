@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient, type Session } from '@supabase/supab
 import { liveQuery } from 'dexie';
 import { useImmersiveMotion } from './composables/useImmersiveMotion';
 import { db, saveRecord, synchronize, removeAccountCache, resolveConflict } from './lib/store';
+import { activeCycle, activePlan, comparePlanDates } from '../shared/cycles';
 import { freezeTargets } from '../shared/volume';
 import { createStarter } from './lib/sample';
 import {
@@ -43,12 +44,13 @@ const rows = ref<LocalRecord[]>([]),
   busy = ref(false),
   toast = ref(''),
   cycleId = ref(''),
+  previousCycleId = ref(''),
   planId = ref(''),
+  previousPlanId = ref(''),
   workoutId = ref(''),
   sessionRecord = ref<LocalRecord | null>(null),
   focusMode = ref(false),
-  builderOpen = ref(false),
-  selectedWorkouts = ref<string[]>([]);
+  builderOpen = ref(false);
 const withings = useWithings(auth, owner, local, online, sync);
 const whoop = useWhoop(auth, owner, local, online);
 useImmersiveMotion();
@@ -79,15 +81,36 @@ const editor = reactive<{ open: boolean; kind: Kind; record?: LocalRecord; paren
   historyRecord = ref<LocalRecord | null>(null),
   videoUrl = ref(''),
   conflictRecord = ref<LocalRecord | null>(null);
+function localToday() {
+  const now = new Date();
+  return [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0'),
+  ].join('-');
+}
 const catalog = computed(() => rows.value.filter((r) => r.kind === 'exercise' && !r.deleted)),
   cycles = computed(() => rows.value.filter((r) => r.kind === 'cycle' && !r.deleted)),
-  cycle = computed(() => cycles.value.find((r) => r.id === cycleId.value) || cycles.value[0]),
+  cycle = computed(() => {
+    return (
+      cycles.value.find((r) => r.id === cycleId.value) ||
+      activeCycle(cycles.value, localToday()) ||
+      cycles.value.find((r) => r.id === previousCycleId.value) ||
+      cycles.value[0]
+    );
+  }),
   plans = computed(() =>
     rows.value
       .filter((r) => r.kind === 'plan' && r.parent_id === cycle.value?.id && !r.deleted)
-      .sort((a, b) => (a.payload as any).order - (b.payload as any).order),
+      .sort(comparePlanDates),
   ),
-  plan = computed(() => plans.value.find((r) => r.id === planId.value) || plans.value[0]),
+  plan = computed(
+    () =>
+      plans.value.find((r) => r.id === planId.value) ||
+      activePlan(plans.value, localToday()) ||
+      plans.value.find((r) => r.id === previousPlanId.value) ||
+      plans.value[0],
+  ),
   workouts = computed(() =>
     rows.value
       .filter((r) => r.kind === 'workout' && r.parent_id === plan.value?.id && !r.deleted)
@@ -212,15 +235,17 @@ async function observeOwner() {
   sessionRecord.value = null;
   focusMode.value = false;
   cycleId.value = '';
+  previousCycleId.value = '';
   planId.value = '';
+  previousPlanId.value = '';
   workoutId.value = '';
   const id = owner.value;
   if (!id) return;
   const saved = (await db.meta.get(id + ':selection'))?.value;
   if (owner.value !== id) return;
   if (saved) {
-    cycleId.value = saved.cycle || '';
-    planId.value = saved.plan || '';
+    previousCycleId.value = saved.cycle || '';
+    previousPlanId.value = saved.plan || '';
     workoutId.value = saved.workout || '';
   }
   const sub = liveQuery(async () => ({
@@ -343,41 +368,9 @@ function sessionSnapshot(row: LocalRecord) {
 watch(
   () => plan.value?.id,
   () => {
-    selectedWorkouts.value = [];
     builderOpen.value = false;
   },
 );
-async function startSelected() {
-  if (busy.value) return;
-  busy.value = true;
-  try {
-    const selected = workouts.value.filter((w) => selectedWorkouts.value.includes(w.id));
-    if (!selected.length || selected.some((w) => !(w.payload as Workout).exercises.length))
-      throw new Error('Seleziona allenamenti con almeno un esercizio.');
-    const started = await db.transaction('rw', db.records, db.queue, async () => {
-      const result: LocalRecord[] = [];
-      const existing = await db.records.where('[user_id+kind]').equals([owner.value, 'session']).toArray();
-      for (const w of selected) {
-        const active = existing.find(
-          (r) =>
-            !r.deleted &&
-            !(r.payload as TrainingSession).completedAt &&
-            (r.payload as TrainingSession).workoutId === w.id,
-        );
-        result.push(active || (await saveRecord(owner.value, 'session', sessionSnapshot(w))));
-      }
-      return result;
-    });
-    sessionRecord.value = started[0]!;
-    focusMode.value = true;
-    selectedWorkouts.value = [];
-    void sync();
-  } catch (e) {
-    notify(e instanceof Error ? e.message : String(e));
-  } finally {
-    busy.value = false;
-  }
-}
 async function start() {
   try {
     if (ongoing.value) {
@@ -688,8 +681,9 @@ const date = (value: string) =>
                 ><div v-if="view === 'percorso'" class="selection-bar">
                   <label
                     >Mesociclo<select
-                      v-model="cycleId"
+                      :value="cycle?.id"
                       @change="
+                        cycleId = ($event.target as HTMLSelectElement).value;
                         planId = '';
                         workoutId = '';
                       "
@@ -709,8 +703,82 @@ const date = (value: string) =>
                     <GIcon name="trash" :size="18" />
                   </button>
                 </div>
-                <div class="dashboard">
-                  <section class="hero">
+                <section v-if="view === 'percorso'" class="plan-catalog" aria-label="Schede del mesociclo">
+                  <div class="panel-title">
+                    <h2>Le tue schede</h2>
+                    <button class="primary" @click="openEditor('plan', undefined, cycle!.id)">
+                      Nuova scheda <GIcon name="plus" />
+                    </button>
+                  </div>
+                  <div class="plan-library">
+                    <article
+                      v-for="p in plans"
+                      :key="p.id"
+                      class="panel plan-card"
+                      :class="{ selected: p.id === plan?.id }"
+                    >
+                      <div class="inline-top">
+                        <GIcon name="layers" />
+                        <div class="button-group">
+                          <button
+                            class="icon-btn"
+                            :aria-label="'Modifica scheda ' + (p.payload as any).name"
+                            title="Modifica scheda"
+                            @click="openEditor('plan', p)"
+                          >
+                            <GIcon name="edit" :size="18" />
+                          </button>
+                          <button
+                            class="icon-btn danger"
+                            :aria-label="'Elimina scheda ' + (p.payload as any).name"
+                            title="Elimina scheda"
+                            @click="deleteRecord = p"
+                          >
+                            <GIcon name="trash" :size="18" />
+                          </button>
+                        </div>
+                      </div>
+                      <h3>{{ (p.payload as any).name }}</h3>
+                      <dl class="plan-card-dates">
+                        <div>
+                          <dt>Inizio</dt>
+                          <dd>
+                            {{ (p.payload as any).start ? date((p.payload as any).start) : 'Da impostare' }}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Fine</dt>
+                          <dd>
+                            {{ (p.payload as any).end ? date((p.payload as any).end) : 'Da impostare' }}
+                          </dd>
+                        </div>
+                      </dl>
+                      <p class="plan-card-notes">{{ (p.payload as any).notes }}</p>
+                      <p class="subtle">
+                        {{
+                          rows.filter((r) => r.kind === 'workout' && r.parent_id === p.id && !r.deleted)
+                            .length
+                        }}
+                        giornate
+                      </p>
+                      <button
+                        class="secondary"
+                        :aria-label="'Seleziona scheda ' + (p.payload as any).name"
+                        :aria-pressed="p.id === plan?.id"
+                        @click="
+                          planId = p.id;
+                          workoutId = '';
+                        "
+                      >
+                        {{ p.id === plan?.id ? 'Scheda selezionata' : 'Mostra giornate' }}
+                        <GIcon name="arrow" :size="18" />
+                      </button>
+                    </article>
+                  </div>
+                  <p v-if="!plans.length" class="notice">Crea la prima scheda di questo mesociclo.</p>
+                </section>
+                <div class="dashboard" :class="{ 'path-dashboard': view === 'percorso' }">
+                  <section v-if="view === 'oggi'" class="hero">
                     <span class="eyebrow">IL TUO MESOCICLO</span>
                     <h2>{{ (cycle!.payload as any).name }}</h2>
                     <p>{{ (cycle!.payload as any).notes || 'Un allenamento alla volta.' }}</p>
@@ -736,7 +804,7 @@ const date = (value: string) =>
                       ><span v-else class="subtle">Dal {{ date((cycle!.payload as any).start) }}</span>
                     </div>
                   </section>
-                  <section class="panel weight-panel">
+                  <section v-if="view === 'oggi'" class="panel weight-panel">
                     <div class="panel-title">
                       <h2>Il tuo peso</h2>
                       <button class="icon-btn" aria-label="Registra peso" @click="openEditor('weight')">
@@ -771,7 +839,7 @@ const date = (value: string) =>
                       >
                     </div>
                   </section>
-                  <section class="panel workout">
+                  <section class="panel workout" aria-label="Giornate della scheda selezionata">
                     <div class="workout-heading">
                       <div>
                         <span class="eyebrow">{{
@@ -781,7 +849,7 @@ const date = (value: string) =>
                       </div>
                       <span class="round-arrow" aria-hidden="true">↗</span>
                     </div>
-                    <div class="plan-select">
+                    <div v-if="view === 'oggi'" class="plan-select">
                       <label
                         >Scheda<select
                           :value="plan?.id"
@@ -794,19 +862,7 @@ const date = (value: string) =>
                             {{ (p.payload as any).name }}
                           </option>
                         </select></label
-                      ><button
-                        v-if="view === 'percorso'"
-                        class="text-btn"
-                        @click="openEditor('plan', undefined, cycle!.id)"
                       >
-                        Nuova +</button
-                      ><button
-                        v-if="plan && view === 'percorso'"
-                        class="text-btn"
-                        @click="openEditor('plan', plan)"
-                      >
-                        Modifica
-                      </button>
                     </div>
                     <p v-if="plan && (plan.payload as any).start" class="subtle">
                       Periodo: {{ date((plan.payload as any).start) }} – {{ date((plan.payload as any).end) }}
@@ -814,27 +870,7 @@ const date = (value: string) =>
                     <button v-if="plan && view === 'percorso'" class="secondary" @click="builderOpen = true">
                       Apri builder scheda
                     </button>
-                    <fieldset v-if="workouts.length">
-                      <legend>Avvia uno o più allenamenti</legend>
-                      <label
-                        v-for="w in workouts"
-                        :key="w.id"
-                        style="display: flex; align-items: center; gap: 8px"
-                        ><input
-                          v-model="selectedWorkouts"
-                          type="checkbox"
-                          :value="w.id"
-                          style="width: auto"
-                        />{{ (w.payload as Workout).name }}</label
-                      >
-                      <button
-                        class="secondary"
-                        :disabled="!selectedWorkouts.length || busy"
-                        @click="startSelected"
-                      >
-                        Avvia selezionati
-                      </button>
-                    </fieldset>
+
                     <div
                       v-if="sessions.some((r) => !(r.payload as TrainingSession).completedAt)"
                       class="button-group"
@@ -868,7 +904,7 @@ const date = (value: string) =>
                     <div v-if="workoutData">
                       <div v-for="e in workoutData.exercises" :key="e.id" class="exercise-row">
                         <div class="exercise-symbol">
-                          <GIcon :name="e.assistance?.length ? 'leaf' : 'barbell'" />
+                          <GIcon :name="e.exerciseType === 'weights' ? 'barbell' : 'pullup'" />
                         </div>
                         <div class="exercise-info">
                           <strong>{{ e.name }}</strong
@@ -936,7 +972,7 @@ const date = (value: string) =>
                       </button>
                     </div>
                   </section>
-                  <div class="right-stack">
+                  <div v-if="view === 'oggi'" class="right-stack">
                     <section class="panel">
                       <div class="panel-title">
                         <h2>Ritmo settimanale</h2>
@@ -988,7 +1024,11 @@ const date = (value: string) =>
               /><TransitionGroup name="list" tag="div" class="library"
                 ><article v-for="e in filteredCatalog" :key="e.id" class="panel exercise-card">
                   <div class="inline-top">
-                    <div class="exercise-symbol"><GIcon name="barbell" /></div>
+                    <div class="exercise-symbol">
+                      <GIcon
+                        :name="(e.payload as Exercise).exerciseType === 'weights' ? 'barbell' : 'pullup'"
+                      />
+                    </div>
                     <button
                       class="icon-btn"
                       :aria-label="'Modifica ' + (e.payload as Exercise).name"

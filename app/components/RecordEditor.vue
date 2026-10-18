@@ -23,6 +23,10 @@ const emit = defineEmits<{
 const draft = ref<any>({}),
   error = ref(''),
   selectedExercise = ref('');
+const selectedVariantId = ref('');
+const selectedVariant = computed(
+  () => draft.value.variants?.find((v: any) => v.id === selectedVariantId.value) || draft.value.variants?.[0],
+);
 const prescriptions = computed(() => draft.value.exercises as Prescription[]);
 const draftKey = computed(
   () => `gymbrain-draft:${props.owner}:${props.kind}:${props.record?.id || props.parentId || 'new'}`,
@@ -59,6 +63,7 @@ watch(
     if (!value) return;
     error.value = '';
     selectedExercise.value = '';
+    selectedVariantId.value = '';
     draft.value = props.record
       ? JSON.parse(
           JSON.stringify(
@@ -129,7 +134,9 @@ function addExercise() {
   selectedExercise.value = '';
 }
 function addVariant() {
-  draft.value.variants.push({ id: crypto.randomUUID(), name: '', notes: '' });
+  const id = crypto.randomUUID();
+  draft.value.variants.push({ id, name: '', notes: '' });
+  selectedVariantId.value = id;
 }
 function variantsFor(id: string) {
   return (props.catalog.find((r) => r.id === id)?.payload as Exercise | undefined)?.variants || [];
@@ -149,7 +156,15 @@ function move(index: number, dir: number) {
   [list[index], list[other]] = [list[other], list[index]];
 }
 function submit() {
-  if (props.kind === 'exercise') delete draft.value.mode;
+  if (props.kind === 'exercise') {
+    const incomplete = draft.value.variants.find((v: any) => !v.name.trim());
+    if (incomplete) {
+      selectedVariantId.value = incomplete.id;
+      error.value = 'Inserisci il nome della variante selezionata.';
+      return;
+    }
+    delete draft.value.mode;
+  }
   emit(
     'save',
     props.kind,
@@ -231,20 +246,33 @@ function clean(set: any, key: string, event: Event) {
           <fieldset class="assistance-picker">
             <legend>Varianti del movimento</legend>
             <p class="notice">Per esempio HSPU con variante Deep. Il sovraccarico si imposta nella scheda.</p>
-            <div v-for="(variant, i) in draft.variants" :key="variant.id" class="variant-editor">
+            <label v-if="draft.variants.length"
+              >Variante da modificare
+              <select
+                :value="selectedVariant?.id || ''"
+                @change="selectedVariantId = ($event.target as HTMLSelectElement).value"
+              >
+                <option v-for="(variant, i) in draft.variants" :key="variant.id" :value="variant.id">
+                  {{ variant.name || 'Nuova variante ' + (Number(i) + 1) }}
+                </option>
+              </select>
+            </label>
+            <div v-if="selectedVariant" :key="selectedVariant.id" class="variant-editor">
               <label
                 >Nome variante<input
-                  v-model="variant.name"
+                  v-model="selectedVariant.name"
                   required
                   maxlength="100"
                   placeholder="Deep / profondo"
               /></label>
-              <MuscleTargets v-model="variant.muscleTargets" :inherited="draft.muscleTargets || {}" />
-              <label>Note variante<textarea v-model="variant.notes" maxlength="4000" rows="2" /></label>
+              <MuscleTargets v-model="selectedVariant.muscleTargets" :inherited="draft.muscleTargets || {}" />
+              <label
+                >Note variante<textarea v-model="selectedVariant.notes" maxlength="4000" rows="2" />
+              </label>
               <button
                 type="button"
                 class="icon-btn danger"
-                @click="draft.variants.splice(i, 1)"
+                @click="draft.variants = draft.variants.filter((v: any) => v.id !== selectedVariant.id)"
                 aria-label="Rimuovi variante"
                 title="Rimuovi variante"
               >
@@ -277,7 +305,7 @@ function clean(set: any, key: string, event: Event) {
             >Durata (settimane)<input v-model.number="draft.weeks" type="number" min="1" max="52" required
           /></label>
         </div>
-        <label v-if="kind === 'plan' || kind === 'workout'"
+        <label v-if="kind === 'workout'"
           >Posizione nell’ordine<input
             v-model.number="draft.order"
             type="number"

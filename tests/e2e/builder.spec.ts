@@ -1,8 +1,6 @@
 import { test, expect } from '@playwright/test';
 test.setTimeout(60000);
-test('Builder: personal targets, multiple days, volume, offline draft and multiple sessions', async ({
-  page,
-}) => {
+test('Builder: personal targets, multiple days, volume, offline draft and session', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
@@ -13,10 +11,23 @@ test('Builder: personal targets, multiple days, volume, offline draft and multip
   const editor = page.getByRole('dialog', { name: 'UN NUOVO INIZIO' });
   await editor.getByLabel('Nome', { exact: true }).fill('Push test');
   await editor.locator('.muscle-targets summary').click();
-  await editor.getByRole('combobox', { name: 'Petto', exact: true }).selectOption('1');
+  await expect(editor.getByRole('combobox', { name: 'Petto', exact: true })).toHaveCount(0);
+  await editor.getByRole('combobox', { name: 'Aggiungi gruppo muscolare' }).selectOption('chest');
+  await editor.getByRole('combobox', { name: 'Aggiungi gruppo muscolare' }).selectOption('triceps');
+  await editor.getByRole('combobox', { name: 'Tricipiti', exact: true }).selectOption('0');
+  await expect(editor.getByRole('combobox', { name: 'Tricipiti', exact: true })).toHaveCount(0);
+  await editor.getByRole('combobox', { name: 'Aggiungi gruppo muscolare' }).selectOption('triceps');
   await editor.getByRole('combobox', { name: 'Tricipiti', exact: true }).selectOption('0.5');
   await editor.getByRole('button', { name: 'Aggiungi variante +' }).click();
   await editor.getByLabel('Nome variante', { exact: true }).fill('Deep');
+  await editor.getByRole('button', { name: 'Aggiungi variante +' }).click();
+  await editor.getByLabel('Nome variante', { exact: true }).fill('Wide');
+  await expect(editor.getByLabel('Nome variante', { exact: true })).toHaveCount(1);
+  await editor
+    .getByRole('combobox', { name: 'Variante da modificare', exact: true })
+    .selectOption({ label: 'Deep' });
+  await expect(editor.getByLabel('Nome variante', { exact: true })).toHaveValue('Deep');
+
   await editor.getByRole('button', { name: 'Salva sul dispositivo' }).click();
   await expect(editor).not.toBeVisible();
   await page.getByRole('button', { name: 'Percorso', exact: true }).click();
@@ -147,14 +158,13 @@ test('Builder: personal targets, multiple days, volume, offline draft and multip
   );
   await builder.getByRole('button', { name: 'Chiudi', exact: true }).click();
   await expect(builder).not.toBeVisible();
-  await page.getByLabel('Lunedì', { exact: true }).check();
-  await page.getByLabel('Mercoledì', { exact: true }).check();
-  await page.getByRole('button', { name: 'Avvia selezionati' }).click();
+  await expect(page.getByRole('button', { name: 'Avvia selezionati' })).toHaveCount(0);
+  await page.locator('.days .day').filter({ hasText: 'Lunedì' }).click();
+  await page.getByRole('button', { name: 'Entra in allenamento' }).click();
   const session = page.getByRole('dialog', { name: 'FOCUS MODE · IL TUO ALLENAMENTO', exact: true });
   await expect(session).toBeVisible();
   await session.getByRole('button', { name: 'Chiudi', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Riprendi: Lunedì', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Riprendi: Mercoledì', exact: true })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -227,4 +237,50 @@ test('Desktop overview and a cluster inside a superset guide execution and prese
   await session.getByRole('button', { name: /1. Pull-up/ }).click();
   await expect(cluster.getByLabel('Ripetizioni', { exact: true }).nth(0)).toHaveValue('4');
   await expect(session.getByRole('button', { name: 'Riapri serie 1', exact: true })).toBeVisible();
+});
+
+test('Current mesocycle is displayed by default after reopening, with manual selection available', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Prova sul dispositivo' }).click();
+  await page.getByRole('button', { name: 'Usa percorso iniziale' }).click();
+  await page.getByRole('button', { name: 'Percorso', exact: true }).click();
+  await page.getByRole('button', { name: 'Nuovo mesociclo +' }).click();
+  const editor = page.getByRole('dialog', { name: 'UN NUOVO INIZIO' });
+  await editor.getByLabel('Nome', { exact: true }).fill('Archivio passato');
+  await editor.getByLabel('Data di inizio').fill('2020-01-01');
+  await editor.getByLabel('Durata (settimane)').fill('1');
+  await editor.getByRole('button', { name: 'Salva sul dispositivo' }).click();
+  const select = page.getByRole('combobox', { name: 'Mesociclo', exact: true });
+  await select.selectOption({ label: 'Archivio passato' });
+  await expect(select.locator('option:checked')).toHaveText('Archivio passato');
+  await page.reload();
+  await expect(page.locator('.hero h2')).toHaveText('Forza, sotto controllo.');
+  await page.getByRole('button', { name: 'Percorso', exact: true }).click();
+  await expect(select.locator('option:checked')).toHaveText('Forza, sotto controllo.');
+  await page.getByRole('button', { name: 'Nuova scheda', exact: true }).click();
+  await editor.getByLabel('Nome', { exact: true }).fill('Scheda passata');
+  await editor.getByLabel('Inizio periodo').fill('2020-01-01');
+  await editor.getByLabel('Fine periodo').fill('2020-02-01');
+  await editor.getByRole('button', { name: 'Salva sul dispositivo' }).click();
+  await page.getByRole('button', { name: 'Seleziona scheda Scheda passata', exact: true }).click();
+  await page.reload();
+  await page.getByRole('button', { name: 'Percorso', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Seleziona scheda Accumulo', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.locator('.plan-card')).toHaveCount(2);
+  await expect(page.locator('.plan-card h3')).toHaveText(['Scheda passata', 'Accumulo']);
+  expect(
+    await page
+      .locator('.plan-card')
+      .evaluateAll((cards) => cards.every((c) => c.getBoundingClientRect().width <= 361)),
+  ).toBe(true);
+  await page.screenshot({
+    path: 'preview-artifacts/path-actions.png',
+    fullPage: true,
+    animations: 'disabled',
+  });
 });

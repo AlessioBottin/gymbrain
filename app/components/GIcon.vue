@@ -3,6 +3,7 @@ defineProps<{ name: string; size?: number }>();
 const paths: Record<string, string> = {
   grid: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z',
   layers: 'm12 3 10 5-10 5L2 8l10-5Zm-10 9 10 5 10-5M2 16l10 5 10-5',
+  pullup: 'M2 2h20M5 2v5l4 3h6l4-3V2M14 6a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM9 10l1 6-1 6M15 10l-1 6 1 6M10 16h4',
   barbell: 'M3 8v8M6 5v14M18 5v14M21 8v8M6 12h12',
   chart: 'M3 3v18h18M6 15l5-5 4 3 6-8',
   arrow: 'M4 12h16m-6-6 6 6-6 6',
