@@ -76,6 +76,15 @@ export async function saveRecord(
   }
   return db.transaction('rw', db.records, db.queue, async () => {
     const previous = await db.records.get([owner, id]);
+    if (
+      !previous &&
+      module === 'training' &&
+      owner !== 'local-device' &&
+      globalThis.navigator?.onLine === false
+    )
+      throw new Error(
+        'Per creare esercizi, mesocicli e schede serve una connessione. Puoi continuare il tuo allenamento offline.',
+      );
     if (previous?.conflict) throw new Error('Risolvi prima il conflitto per questo elemento.');
     if (options.expectedRevision !== undefined && previous?.localRevision !== options.expectedRevision)
       throw new Error('Elemento modificato in un’altra finestra. Riaprilo prima di salvare.');

@@ -15,7 +15,7 @@ test('Draft survives Escape and reopening; padding cannot dismiss the editor', a
   await page.getByRole('button', { name: 'Nuovo esercizio' }).click();
   await expect(dialog.getByLabel('Nome', { exact: true })).toHaveValue('Bozza resistente');
   await expect(dialog.getByLabel('Note generali')).toHaveValue('Queste note non devono sparire');
-  await dialog.getByRole('button', { name: 'Salva sul dispositivo' }).click();
+  await dialog.getByRole('button', { name: 'Salva', exact: true }).click();
   await page.getByRole('button', { name: 'Nuovo esercizio' }).click();
   await expect(dialog.getByLabel('Nome', { exact: true })).toHaveValue('');
 });

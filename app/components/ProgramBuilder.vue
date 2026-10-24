@@ -145,7 +145,7 @@ const saveStatus = computed(() =>
       ? 'Modifiche da completare'
       : content.value !== savedContent.value
         ? 'Modifiche in attesa…'
-        : 'Salvato sul dispositivo',
+        : 'Modifiche salvate',
 );
 function persistDraft() {
   try {
@@ -188,6 +188,10 @@ function resetDraft() {
   error.value = '';
 }
 function addDay(name: string) {
+  if (props.owner !== 'local-device' && !navigator.onLine) {
+    error.value = 'Torna online per aggiungere una giornata.';
+    return;
+  }
   const day = {
     id: crypto.randomUUID(),
     payload: { name, notes: '', order: days.value.length, exercises: [] },

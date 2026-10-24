@@ -28,7 +28,7 @@ test('real account: sync to the shared database, expired-login offline cache, re
     await page.getByRole('button', { name: 'Esercizi', exact: true }).click()
     await page.getByRole('button', { name: 'Nuovo esercizio' }).click()
     await page.getByRole('dialog').getByLabel('Nome', { exact: true }).fill('Cloud pull-up')
-    await page.getByRole('button', { name: 'Salva sul dispositivo' }).click()
+    await page.getByRole('button', { name: 'Salva', exact: true }).click()
     await expect
       .poll(
         async () => {
@@ -53,7 +53,7 @@ test('real account: sync to the shared database, expired-login offline cache, re
     await expect(page.getByRole('heading', { name: 'Cloud pull-up', exact: true })).toBeVisible()
     await page.getByRole('button', { name: 'Modifica Cloud pull-up', exact: true }).click()
     await page.getByRole('dialog').getByLabel('Note generali').fill('Registrato offline con login scaduto')
-    await page.getByRole('button', { name: 'Salva sul dispositivo' }).click()
+    await page.getByRole('button', { name: 'Salva', exact: true }).click()
     await page.reload()
     await page.getByRole('button', { name: 'Esercizi', exact: true }).click()
     await expect(page.getByText('Registrato offline con login scaduto', { exact: true })).toBeVisible()

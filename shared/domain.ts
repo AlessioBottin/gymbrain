@@ -53,7 +53,7 @@ export const muscleGroups = {
   forearms: 'Avambracci',
   abs: 'Addominali',
   obliques: 'Obliqui (core)',
-  erectors: 'Erettori',
+  erectors: 'Lombari',
   adductors: 'Adduttori',
 } as const;
 export type Muscle = keyof typeof muscleGroups;

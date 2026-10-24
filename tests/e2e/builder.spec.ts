@@ -10,7 +10,8 @@ test('Builder: personal targets, multiple days, volume, offline draft and sessio
   await page.getByRole('button', { name: 'Nuovo esercizio' }).click();
   const editor = page.getByRole('dialog', { name: 'UN NUOVO INIZIO' });
   await editor.getByLabel('Nome', { exact: true }).fill('Push test');
-  await editor.locator('.muscle-targets summary').click();
+  await expect(editor.getByRole('heading', { name: 'Muscoli target', exact: true })).toBeVisible();
+  await expect(editor.locator('.muscle-targets summary')).toHaveCount(0);
   await expect(editor.getByRole('combobox', { name: 'Petto', exact: true })).toHaveCount(0);
   await editor.getByRole('combobox', { name: 'Aggiungi gruppo muscolare' }).selectOption('chest');
   await editor.getByRole('combobox', { name: 'Aggiungi gruppo muscolare' }).selectOption('triceps');
@@ -25,12 +26,18 @@ test('Builder: personal targets, multiple days, volume, offline draft and sessio
   await expect(editor.getByRole('combobox', { name: 'Petto', exact: true })).toHaveValue('1');
   await expect(editor.getByRole('combobox', { name: 'Deltoidi frontali', exact: true })).toHaveValue('0.7');
 
+  await editor.getByRole('combobox', { name: 'Aggiungi gruppo muscolare' }).selectOption('back');
+  await editor.getByRole('combobox', { name: 'Schiena', exact: true }).selectOption('0.5');
+  await editor.getByRole('combobox', { name: 'Aggiungi gruppo muscolare' }).selectOption('erectors');
+  await expect(editor.getByRole('combobox', { name: 'Lombari', exact: true })).toHaveValue('1');
+  await expect(editor.getByRole('combobox', { name: 'Petto', exact: true })).toHaveValue('1');
   const variantEditor = page.getByRole('dialog', { name: 'VARIANTE DEL MOVIMENTO', exact: true });
   for (const name of ['Deep', 'Wide']) {
     await editor.getByRole('button', { name: 'Aggiungi variante +' }).click();
     await variantEditor.getByLabel('Nome variante', { exact: true }).fill(name);
     await variantEditor.getByRole('button', { name: 'Conferma variante', exact: true }).click();
   }
+  await expect(editor.locator('.variant-summary')).toHaveText('2 varianti: Deep / Wide');
   await expect(editor.getByLabel('Nome variante', { exact: true })).toHaveCount(0);
   await editor
     .getByRole('combobox', { name: 'Variante da modificare', exact: true })
@@ -55,8 +62,25 @@ test('Builder: personal targets, multiple days, volume, offline draft and sessio
   await expect(
     editor.getByRole('combobox', { name: 'Variante da modificare', exact: true }).locator('option:checked'),
   ).toHaveText('Deep');
-  await editor.getByRole('button', { name: 'Salva sul dispositivo' }).click();
+  await editor.getByRole('button', { name: 'Salva', exact: true }).click();
   await expect(editor).not.toBeVisible();
+  await page.getByRole('button', { name: 'Modifica Push test', exact: true }).click();
+  const reopenedEditor = page.getByRole('dialog', { name: 'PERSONALIZZA IL TUO PERCORSO' });
+  await expect(reopenedEditor.getByRole('combobox', { name: 'Schiena', exact: true })).toHaveValue('0.5');
+  await expect(reopenedEditor.getByRole('combobox', { name: 'Lombari', exact: true })).toHaveValue('1');
+  await expect(reopenedEditor.locator('.variant-summary')).toHaveText('2 varianti: Deep / Wide');
+  await expect(
+    reopenedEditor.getByRole('combobox', { name: 'Variante da modificare' }).locator('option'),
+  ).toHaveText(['Deep', 'Wide']);
+  await reopenedEditor.getByRole('button', { name: 'Chiudi', exact: true }).click();
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  expect(
+    await page
+      .locator('.library')
+      .evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length),
+  ).toBe(4);
+  await page.screenshot({ path: 'preview-artifacts/catalog-compact.png', fullPage: true });
+
   await page.getByRole('button', { name: 'Percorso', exact: true }).click();
   await page.getByRole('button', { name: 'Apri builder scheda' }).click();
   const builder = page.getByRole('dialog', { name: 'BUILDER DELLA SCHEDA' });
@@ -278,13 +302,13 @@ test('Current mesocycle is displayed by default after reopening, with manual sel
   await editor.getByLabel('Nome', { exact: true }).fill('Archivio passato');
   await editor.getByLabel('Data di inizio').fill('2020-01-01');
   await editor.getByLabel('Durata (settimane)').fill('1');
-  await editor.getByRole('button', { name: 'Salva sul dispositivo' }).click();
+  await editor.getByRole('button', { name: 'Salva', exact: true }).click();
   const select = page.getByRole('combobox', { name: 'Mesociclo', exact: true });
   await select.selectOption({ label: 'Archivio passato' });
   await expect(select.locator('option:checked')).toHaveText('Archivio passato');
   await page.getByRole('button', { name: 'Nuova scheda', exact: true }).click();
   await editor.getByLabel('Nome', { exact: true }).fill('Scheda archivio');
-  await editor.getByRole('button', { name: 'Salva sul dispositivo' }).click();
+  await editor.getByRole('button', { name: 'Salva', exact: true }).click();
   await page.getByRole('button', { name: 'Apri builder scheda' }).click();
   const archivedBuilder = page.getByRole('dialog', { name: 'BUILDER DELLA SCHEDA' });
   await expect(archivedBuilder.getByRole('heading', { name: 'Scheda archivio', exact: true })).toBeVisible();
@@ -300,7 +324,7 @@ test('Current mesocycle is displayed by default after reopening, with manual sel
   await editor.getByLabel('Nome', { exact: true }).fill('Scheda passata');
   await editor.getByLabel('Inizio periodo').fill('2020-01-01');
   await editor.getByLabel('Fine periodo').fill('2020-02-01');
-  await editor.getByRole('button', { name: 'Salva sul dispositivo' }).click();
+  await editor.getByRole('button', { name: 'Salva', exact: true }).click();
   await page.getByRole('button', { name: 'Seleziona scheda Scheda passata', exact: true }).click();
   await page.getByRole('button', { name: 'Apri builder scheda' }).click();
   const pastBuilder = page.getByRole('dialog', { name: 'BUILDER DELLA SCHEDA' });

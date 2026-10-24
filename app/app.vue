@@ -39,9 +39,10 @@ const rows = ref<LocalRecord[]>([]),
   pending = ref(0),
   view = ref('oggi'),
   search = ref(''),
-  status = ref('Salvato sul dispositivo'),
+  status = ref('Connessione al tuo account...'),
   online = ref(true),
   busy = ref(false),
+  savingRecord = ref(false),
   toast = ref(''),
   cycleId = ref(''),
   previousCycleId = ref(''),
@@ -206,6 +207,7 @@ let unsubscribe: (() => void) | undefined,
   interval: ReturnType<typeof setInterval> | undefined,
   toastTimer: ReturnType<typeof setTimeout>,
   syncing = false;
+let syncTask: Promise<void> | undefined;
 function notify(message: string) {
   toast.value = message;
   void nextTick(() => {
@@ -216,27 +218,32 @@ function notify(message: string) {
   toastTimer = setTimeout(() => (toast.value = ''), 5000);
 }
 async function sync() {
-  if (syncing || !owner.value) return;
+  if (syncTask) return syncTask;
+  if (!owner.value) return;
   if (local.value) {
     status.value = 'Solo dispositivo';
     return;
   }
   const id = owner.value;
   syncing = true;
-  try {
-    await synchronize(
-      id,
-      async () => {
-        const { data } = await auth.value!.auth.getSession();
-        return data.session?.user.id === id ? data.session.access_token : null;
-      },
-      (s) => {
-        if (owner.value === id) status.value = s;
-      },
-    );
-  } finally {
-    syncing = false;
-  }
+  syncTask = (async () => {
+    try {
+      await synchronize(
+        id,
+        async () => {
+          const { data } = await auth.value!.auth.getSession();
+          return data.session?.user.id === id ? data.session.access_token : null;
+        },
+        (s) => {
+          if (owner.value === id) status.value = s;
+        },
+      );
+    } finally {
+      syncing = false;
+      syncTask = undefined;
+    }
+  })();
+  return syncTask;
 }
 async function observeOwner() {
   editor.open = false;
@@ -340,6 +347,10 @@ function enterLocal() {
   local.value = true;
 }
 function openEditor(kind: Kind, record?: LocalRecord, parentId?: string) {
+  if (!record && kind !== 'weight' && !local.value && !online.value) {
+    notify('Torna online per creare esercizi, mesocicli e schede. L’allenamento resta disponibile offline.');
+    return;
+  }
   Object.assign(editor, { open: true, kind, record, parentId });
 }
 async function save(
@@ -349,14 +360,35 @@ async function save(
   parentId?: string | null,
   expectedRevision?: number,
 ) {
+  if (savingRecord.value) return;
+  savingRecord.value = true;
+  const account = owner.value;
   try {
-    await saveRecord(owner.value, kind, payload, { id, parentId, expectedRevision });
+    const saved = await saveRecord(account, kind, payload, { id, parentId, expectedRevision });
+    if (!local.value) {
+      try {
+        await sync();
+        if (owner.value === account && (await db.records.get([account, saved.id]))?.dirty && online.value)
+          await sync();
+      } catch {
+        status.value = 'Sincronizzazione in attesa';
+      }
+    }
+    const pending = (await db.records.get([account, saved.id]))?.dirty;
+    if (owner.value !== account) return;
     editor.open = false;
     localStorage.removeItem(`gymbrain-draft:${owner.value}:${kind}:${id || parentId || 'new'}`);
-    notify('Salvato sul dispositivo');
-    void sync();
+    notify(
+      local.value
+        ? 'Salvato nella demo'
+        : pending
+          ? 'Modifiche protette: sincronizzazione in attesa. Verranno inviate appena la connessione torna disponibile.'
+          : 'Salvato online',
+    );
   } catch (e) {
     notify(e instanceof Error ? e.message : 'Salvataggio non riuscito');
+  } finally {
+    savingRecord.value = false;
   }
 }
 async function seed() {
@@ -1314,6 +1346,7 @@ const date = (value: string) =>
       :owner="owner"
       :open="editor.open"
       :kind="editor.kind"
+      :saving="savingRecord"
       :record="editor.record"
       :parent-id="editor.parentId"
       :catalog="catalog"

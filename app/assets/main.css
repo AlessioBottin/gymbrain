@@ -668,11 +668,12 @@ footer {
 }
 .library {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
 }
 .exercise-card {
-  min-height: 180px;
+  padding: 20px;
+  min-height: 160px;
   transition:
     border-color 0.3s,
     transform 0.4s var(--ease);
@@ -682,7 +683,7 @@ footer {
   border-color: #c7f48144;
 }
 .exercise-card .exercise-symbol {
-  margin-bottom: 23px;
+  margin-bottom: 14px;
   color: var(--lime);
 }
 .exercise-card h2 {
@@ -1034,7 +1035,7 @@ dialog::backdrop {
     padding: 25px;
   }
   .library {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 @media (max-width: 900px) {

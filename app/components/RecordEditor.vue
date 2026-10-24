@@ -12,6 +12,7 @@ import {
 } from '../../shared/domain';
 const props = defineProps<{
   owner: string;
+  saving?: boolean;
   open: boolean;
   kind: Kind;
   record?: LocalRecord;
@@ -74,7 +75,7 @@ watch(
         draftKey.value,
         JSON.stringify({ payload: draft.value, revision: baseRevision.value }),
       );
-      draftNotice.value = 'Bozza conservata su questo dispositivo.';
+      draftNotice.value = 'Modifiche non ancora confermate.';
     } catch {
       draftNotice.value = 'Spazio locale non disponibile: salva prima di chiudere.';
     }
@@ -217,8 +218,8 @@ function clean(set: any, key: string, event: Event) {
     :open="open"
     :title="record ? 'PERSONALIZZA IL TUO PERCORSO' : 'UN NUOVO INIZIO'"
     :wide="kind === 'workout'"
-    @close="emit('close')"
-    ><form v-if="open" @submit.prevent="submit">
+    @close="!saving && emit('close')"
+    ><form v-if="open" @submit.prevent="submit" :aria-busy="saving" :inert="saving || undefined">
       <p class="draft-status" role="status">{{ draftNotice }}</p>
       <button
         type="button"
@@ -275,10 +276,16 @@ function clean(set: any, key: string, event: Event) {
               <option value="duration">Isometria - secondi</option>
             </select></label
           >
-          <MuscleTargets v-model="draft.muscleTargets" />
+          <section aria-label="Muscoli target dell'esercizio">
+            <h3>Muscoli target</h3>
+            <MuscleTargets v-model="draft.muscleTargets" expanded />
+          </section>
           <fieldset class="assistance-picker">
             <legend>Varianti del movimento</legend>
             <p class="notice">Per esempio HSPU con variante Deep. Il sovraccarico si imposta nella scheda.</p>
+            <p v-if="draft.variants.length" class="variant-summary" role="status">
+              {{ draft.variants.length }} varianti: {{ draft.variants.map((v: any) => v.name).join(' / ') }}
+            </p>
             <div v-if="draft.variants.length" class="variant-selection">
               <label
                 >Variante da modificare
@@ -526,8 +533,8 @@ function clean(set: any, key: string, event: Event) {
         ></template
       >
       <p v-if="error" role="alert">{{ error }}</p>
-      <button type="submit" class="primary modal-save">
-        Salva sul dispositivo <GIcon name="check" />
+      <button type="submit" class="primary modal-save" :disabled="saving">
+        {{ saving ? 'Salvataggio in corso...' : 'Salva' }} <GIcon name="check" />
       </button></form
   ></AppModal>
   <AppModal :open="open && !!variantDraft" title="VARIANTE DEL MOVIMENTO" @close="variantDraft = undefined">

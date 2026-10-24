@@ -14,7 +14,7 @@ test('One recorded set completes a workout; blank sets are excluded and zero is 
   await expect(session.getByRole('button', { name: 'Riapri serie 1', exact: true })).toHaveCount(0);
   await reps.fill('5');
   await session.getByRole('button', { name: 'Completa serie 1', exact: true }).click();
-  await expect(session.getByText('Salvato sul dispositivo', { exact: true })).toBeVisible();
+  await expect(session.getByText('Progressi salvati', { exact: true })).toBeVisible();
   await session.getByRole('button', { name: 'Concludi' }).click();
   const confirmation = page
     .getByRole('dialog')
@@ -33,14 +33,14 @@ test('An isometric exercise is prescribed and recorded in seconds', async ({ pag
   const editor = page.getByRole('dialog');
   await editor.getByLabel('Nome', { exact: true }).fill('Plank');
   await editor.getByLabel('Modalità di esecuzione').selectOption('duration');
-  await editor.getByRole('button', { name: 'Salva sul dispositivo' }).click();
+  await editor.getByRole('button', { name: 'Salva', exact: true }).click();
   await expect(editor).not.toBeVisible();
   await page.getByRole('button', { name: 'Percorso', exact: true }).click();
   await page.getByRole('button', { name: 'Modifica giornata' }).click();
   await editor.getByLabel('Aggiungi dal tuo catalogo').selectOption({ label: 'Plank' });
   await editor.getByRole('button', { name: 'Aggiungi +', exact: true }).click();
   await expect(editor.getByLabel('Plank serie 1 target tut', { exact: true })).toHaveValue('30');
-  await editor.getByRole('button', { name: 'Salva sul dispositivo' }).click();
+  await editor.getByRole('button', { name: 'Salva', exact: true }).click();
   await expect(editor).not.toBeVisible();
   await page.getByRole('button', { name: 'Oggi', exact: true }).click();
   await page.getByRole('button', { name: /Avvia/ }).click();

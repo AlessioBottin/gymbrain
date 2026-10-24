@@ -137,3 +137,64 @@ test('Sessions snapshot targets, leave perceived values empty and preserve origi
   assert.equal(session.exercises[0]!.originalName, 'Pull-up')
   assert.equal(session.bodyWeight, 74.8)
 })
+
+test('Account creation requires connectivity; cached edits and workout progress survive offline', async () => {
+  const owner = 'offline-policy';
+  const original = Object.getOwnPropertyDescriptor(navigator, 'onLine');
+  const payload = {
+    name: 'Push',
+    notes: '',
+    description: '',
+    exerciseType: 'bodyweight' as const,
+    variants: [],
+    videoUrl: '',
+  };
+  const row = await saveRecord(owner, 'exercise', payload);
+  const workout = await saveRecord(owner, 'workout', {
+    name: 'Monday',
+    notes: '',
+    order: 0,
+    exercises: [
+      {
+        id: crypto.randomUUID(),
+        exerciseId: row.id,
+        name: 'Push',
+        notes: '',
+        mode: 'bodyweight',
+        exerciseType: 'bodyweight',
+        measurement: 'reps',
+        variant: null,
+        assistance: [],
+        band: '',
+        alternatives: [],
+        sets: [{ reps: 8, load: null, rpe: null, rir: null, tut: null }],
+      },
+    ],
+  });
+  try {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    await assert.rejects(saveRecord(owner, 'exercise', payload), /connessione/);
+    await assert.rejects(
+      saveRecord(owner, 'cycle', { name: 'New', notes: '', start: '2026-10-24', weeks: 4 }),
+      /connessione/,
+    );
+    const updated = await saveRecord(
+      owner,
+      'exercise',
+      { ...payload, notes: 'Offline edit' },
+      { id: row.id },
+    );
+    assert.equal(updated.dirty, true);
+    const session = snapshotSession({ ...workout, parent_id: crypto.randomUUID() }, 75);
+    session.exercises[0]!.actual[0]!.reps = 8;
+    session.exercises[0]!.actual[0]!.done = true;
+    const progress = await saveRecord(owner, 'session', session);
+    assert.equal((await db.records.get([owner, progress.id]))?.dirty, true);
+    assert.ok(
+      (await db.queue.where('owner').equals(owner).toArray()).some((op) => op.mutation.id === progress.id),
+    );
+  } finally {
+    if (original) Object.defineProperty(navigator, 'onLine', original);
+    else Reflect.deleteProperty(navigator, 'onLine');
+  }
+});

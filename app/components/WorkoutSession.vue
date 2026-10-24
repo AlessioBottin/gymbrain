@@ -229,7 +229,7 @@ const modes: Record<string, string> = {
       <div class="inline-top">
         <span class="subtle">{{ draft.name }} · {{ done }}/{{ total }} serie</span
         ><span class="subtle" role="status">{{
-          saving ? 'Salvataggio…' : saveError ? 'Errore di salvataggio' : 'Salvato sul dispositivo'
+          saving ? 'Salvataggio…' : saveError ? 'Errore di salvataggio' : 'Progressi salvati'
         }}</span>
       </div>
       <label class="session-weight"

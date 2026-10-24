@@ -64,7 +64,7 @@ test('PWA updates automatically across tabs, defers workout reload and retains o
     await session.getByRole('textbox', { name: 'Serie 1 load', exact: true }).fill('12.5')
     await session.getByRole('textbox', { name: 'Serie 1 reps', exact: true }).fill('6')
     await session.getByRole('button', { name: 'Completa serie 1', exact: true }).click()
-    await expect(session.getByText('Salvato sul dispositivo', { exact: true })).toBeVisible()
+    await expect(session.getByText('Progressi salvati', { exact: true })).toBeVisible()
     await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBeTruthy()
     const other = await context.newPage()
     await other.goto(url)

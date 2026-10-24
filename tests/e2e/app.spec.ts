@@ -22,7 +22,7 @@ test('Chrome desktop: create a plan, log a session, reload offline and finish wi
   await session.getByRole('textbox', { name: 'Serie 1 rir', exact: true }).fill('2')
   await session.getByRole('button', { name: 'Completa serie 1', exact: true }).click()
   await expect(session.getByRole('button', { name: 'Riapri serie 1', exact: true })).toBeVisible()
-  await expect(session.getByText('Salvato sul dispositivo', { exact: true })).toBeVisible()
+  await expect(session.getByText('Progressi salvati', { exact: true })).toBeVisible()
   await page.evaluate(async () => {
     await navigator.serviceWorker.ready
   })
@@ -82,7 +82,7 @@ test('Chrome mobile: library creation, prescription editing, responsive layout',
   await variantEditor.getByLabel('Nome variante').fill('Deep')
   await variantEditor.getByLabel('Note variante').fill('Discesa profonda sulle parallettes')
   await variantEditor.getByRole('button', { name: 'Conferma variante', exact: true }).click()
-  await editor.getByRole('button', { name: 'Salva sul dispositivo' }).click()
+  await editor.getByRole('button', { name: 'Salva', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'HSPU' })).toBeVisible()
   await page.getByRole('button', { name: 'Percorso', exact: true }).click()
   await page.getByRole('button', { name: 'Modifica giornata' }).click()
@@ -96,7 +96,7 @@ test('Chrome mobile: library creation, prescription editing, responsive layout',
     .check()
   await workout.getByLabel('HSPU serie 1 target load', { exact: true }).fill('5')
   await workout.getByLabel('Note specifiche per questa scheda').last().fill('Esecuzione esplosiva')
-  await workout.getByRole('button', { name: 'Salva sul dispositivo' }).click()
+  await workout.getByRole('button', { name: 'Salva', exact: true }).click()
   await expect(page.getByText('Esecuzione esplosiva', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Account', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Il peso, in sintonia.' })).toBeVisible()
