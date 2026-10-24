@@ -86,7 +86,7 @@ test('Chrome mobile: library creation, prescription editing, responsive layout',
   await editor.getByLabel(/Video dimostrativo/).fill('https://example.com/video')
   await page.screenshot({ path: 'preview-artifacts/compact-exercise-options.png' })
   await editor.getByLabel('Note generali').fill('Controllo in verticale')
-  await editor.getByRole('button', { name: 'Aggiungi variante +' }).click()
+  await editor.getByRole('button', { name: 'Aggiungi variante' }).click()
   const variantEditor = page.getByRole('dialog', { name: 'VARIANTE DEL MOVIMENTO', exact: true })
   await variantEditor.getByLabel('Nome variante').fill('Deep')
   await variantEditor.getByLabel('Note variante').fill('Discesa profonda sulle parallettes')

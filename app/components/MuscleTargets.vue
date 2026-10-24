@@ -8,12 +8,9 @@ const inheritedTargets = computed(() => normalizeMuscleTargets(props.inherited) 
 const effective = (m: Muscle) => ownTargets.value?.[m] ?? inheritedTargets.value?.[m] ?? 0;
 const activeMuscles = computed(() => muscles.filter((m) => effective(m) > 0));
 const addedMuscle = ref<Muscle | ''>('');
-watch(activeMuscles, (active) => {
-  if (addedMuscle.value && !active.includes(addedMuscle.value)) addedMuscle.value = '';
-});
-function addMuscle(event: Event) {
-  const select = event.target as HTMLSelectElement;
-  const m = select.value as Muscle;
+
+function addMuscle() {
+  const m = addedMuscle.value as Muscle;
   if (muscles.includes(m) && effective(m) === 0) {
     addedMuscle.value = m;
     emit('update:modelValue', { ...ownTargets.value, [m]: 1 });
@@ -29,18 +26,24 @@ function change(m: Muscle, event: Event) {
 </script>
 <template>
   <component :is="expanded ? 'div' : 'details'" class="muscle-targets">
-    <summary v-if="!expanded">
-      {{ inherited ? 'Target variante' : 'Muscoli target' }}
-    </summary>
-    <label
-      >Aggiungi muscolo
-      <select :value="addedMuscle" @change="addMuscle">
-        <option value="">Scegli un muscolo</option>
+    <summary v-if="!expanded">Target muscolari</summary>
+    <div class="selector-add-row">
+      <select v-model="addedMuscle" aria-label="Target muscolari">
+        <option value="">Seleziona muscolo</option>
         <option v-for="m in muscles" :key="m" :value="m" :disabled="effective(m) > 0">
           {{ muscleGroups[m] }}{{ effective(m) > 0 ? ' (aggiunto)' : '' }}
         </option>
       </select>
-    </label>
+      <button
+        type="button"
+        class="secondary compact-add"
+        aria-label="Aggiungi target muscolare"
+        :disabled="!addedMuscle || effective(addedMuscle) > 0"
+        @click="addMuscle"
+      >
+        Aggiungi
+      </button>
+    </div>
     <div class="muscle-grid">
       <label v-for="m in activeMuscles" :key="m"
         >{{ muscleGroups[m] }}

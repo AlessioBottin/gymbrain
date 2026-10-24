@@ -318,29 +318,35 @@ function clean(set: any, key: string, event: Event) {
               >
             </div>
           </fieldset>
-          <section aria-label="Muscoli target dell'esercizio">
-            <h3>Muscoli target</h3>
+          <section aria-label="Target muscolari dell'esercizio">
+            <h3>Target muscolari</h3>
             <MuscleTargets v-model="draft.muscleTargets" expanded />
           </section>
           <fieldset class="assistance-picker">
-            <legend>Varianti del movimento</legend>
-            <p class="notice">Per esempio HSPU con variante Deep. Il sovraccarico si imposta nella scheda.</p>
-            <p v-if="draft.variants.length" class="variant-summary" role="status">
-              {{ draft.variants.length }} varianti: {{ draft.variants.map((v: any) => v.name).join(' / ') }}
-            </p>
-            <div v-if="draft.variants.length" class="variant-selection">
-              <label
-                >Variante da modificare
-                <select
-                  :value="selectedVariant?.id || ''"
-                  @change="selectedVariantId = ($event.target as HTMLSelectElement).value"
-                >
-                  <option v-for="(variant, i) in draft.variants" :key="variant.id" :value="variant.id">
-                    {{ variant.name || 'Nuova variante ' + (Number(i) + 1) }}
-                  </option>
-                </select>
-              </label>
+            <legend>Varianti</legend>
+            <div class="selector-add-row variant-selection">
+              <select
+                aria-label="Variante da modificare"
+                :value="selectedVariant?.id || ''"
+                :disabled="!draft.variants.length"
+                @change="selectedVariantId = ($event.target as HTMLSelectElement).value"
+              >
+                <option v-if="!draft.variants.length" value="">Nessuna variante</option>
+                <option v-for="variant in draft.variants" :key="variant.id" :value="variant.id">
+                  {{ variant.name }}
+                </option>
+              </select>
               <button
+                type="button"
+                class="secondary compact-add"
+                aria-label="Aggiungi variante"
+                :disabled="draft.variants.length >= 30"
+                @click="addVariant"
+              >
+                Aggiungi
+              </button>
+              <button
+                v-if="selectedVariant"
                 type="button"
                 class="icon-btn"
                 aria-label="Modifica variante"
@@ -350,6 +356,7 @@ function clean(set: any, key: string, event: Event) {
                 <GIcon name="edit" :size="18" />
               </button>
               <button
+                v-if="selectedVariant"
                 type="button"
                 class="icon-btn danger"
                 aria-label="Rimuovi variante"
@@ -359,14 +366,6 @@ function clean(set: any, key: string, event: Event) {
                 <GIcon name="trash" :size="18" />
               </button>
             </div>
-            <button
-              type="button"
-              class="secondary"
-              :disabled="draft.variants.length >= 30"
-              @click="addVariant"
-            >
-              Aggiungi variante +
-            </button>
           </fieldset>
           <button
             v-if="!videoLinkOpen && !draft.videoUrl"
