@@ -29,10 +29,15 @@ test('An isometric exercise is prescribed and recorded in seconds', async ({ pag
   await page.getByRole('button', { name: 'Prova sul dispositivo' }).click();
   await page.getByRole('button', { name: 'Usa percorso iniziale' }).click();
   await page.getByRole('button', { name: 'Esercizi', exact: true }).click();
+  await page.getByRole('button', { name: 'Modifica Pull-up', exact: true }).click();
+  await expect(page.getByRole('dialog').getByRole('radio', { name: 'Ripetizioni', exact: true })).toBeChecked();
+  await page.getByRole('dialog').getByRole('button', { name: 'Chiudi', exact: true }).click();
   await page.getByRole('button', { name: 'Nuovo esercizio' }).click();
   const editor = page.getByRole('dialog');
   await editor.getByLabel('Nome', { exact: true }).fill('Plank');
-  await editor.getByLabel('Modalità di esecuzione').selectOption('duration');
+  await editor.getByText('Isometria', { exact: true }).click();
+  await expect(editor.getByRole('radio', { name: 'Isometria', exact: true })).toBeChecked();
+  await page.screenshot({ path: 'preview-artifacts/exercise-choice-buttons.png' });
   await editor.getByRole('button', { name: 'Salva', exact: true }).click();
   await expect(editor).not.toBeVisible();
   await page.getByRole('button', { name: 'Percorso', exact: true }).click();

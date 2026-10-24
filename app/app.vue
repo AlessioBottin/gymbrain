@@ -66,6 +66,8 @@ const builderWorkouts = computed(() =>
 const withings = useWithings(auth, owner, local, online, sync);
 const whoop = useWhoop(auth, owner, local, online);
 useImmersiveMotion();
+const catalogSearch = ref<HTMLInputElement>();
+watch(catalogSearch, (input) => input?.focus({ preventScroll: true }), { flush: 'post' });
 watch(view, async () => {
   await nextTick();
   window.scrollTo({ top: 0, behavior: 'instant' });
@@ -1089,6 +1091,7 @@ const date = (value: string) =>
                 </button>
               </div>
               <input
+                ref="catalogSearch"
                 v-model="search"
                 class="search"
                 type="search"

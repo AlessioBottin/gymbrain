@@ -7,12 +7,17 @@ const ownTargets = computed(() => normalizeMuscleTargets(props.modelValue) as Mu
 const inheritedTargets = computed(() => normalizeMuscleTargets(props.inherited) as MuscleTargets | undefined);
 const effective = (m: Muscle) => ownTargets.value?.[m] ?? inheritedTargets.value?.[m] ?? 0;
 const activeMuscles = computed(() => muscles.filter((m) => effective(m) > 0));
-const availableMuscles = computed(() => muscles.filter((m) => effective(m) === 0));
+const addedMuscle = ref<Muscle | ''>('');
+watch(activeMuscles, (active) => {
+  if (addedMuscle.value && !active.includes(addedMuscle.value)) addedMuscle.value = '';
+});
 function addMuscle(event: Event) {
   const select = event.target as HTMLSelectElement;
   const m = select.value as Muscle;
-  if (muscles.includes(m)) emit('update:modelValue', { ...ownTargets.value, [m]: 1 });
-  select.value = '';
+  if (muscles.includes(m) && effective(m) === 0) {
+    addedMuscle.value = m;
+    emit('update:modelValue', { ...ownTargets.value, [m]: 1 });
+  }
 }
 function change(m: Muscle, event: Event) {
   const value = (event.target as HTMLSelectElement).value;
@@ -31,11 +36,13 @@ function change(m: Muscle, event: Event) {
       Puoi aggiungere più gruppi muscolari allo stesso esercizio. Ogni serie conta da 0 a 1 per ciascun
       muscolo, con coefficienti indipendenti.
     </p>
-    <label v-if="availableMuscles.length"
+    <label
       >Aggiungi gruppo muscolare
-      <select value="" @change="addMuscle">
+      <select :value="addedMuscle" @change="addMuscle">
         <option value="">Scegli un muscolo</option>
-        <option v-for="m in availableMuscles" :key="m" :value="m">{{ muscleGroups[m] }}</option>
+        <option v-for="m in muscles" :key="m" :value="m" :disabled="effective(m) > 0">
+          {{ muscleGroups[m] }}{{ effective(m) > 0 ? ' (aggiunto)' : '' }}
+        </option>
       </select>
     </label>
     <p v-if="!activeMuscles.length" class="notice">Nessun target attivo. Aggiungi i muscoli allenati.</p>

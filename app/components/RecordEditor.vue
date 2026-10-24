@@ -26,6 +26,12 @@ const emit = defineEmits<{
 const draft = ref<any>({}),
   error = ref(''),
   selectedExercise = ref('');
+const selectedMeasurement = computed({
+  get: () => draft.value.measurement || 'reps',
+  set: (value: string) => {
+    draft.value.measurement = value;
+  },
+});
 const selectedVariantId = ref('');
 const selectedVariant = computed(
   () => draft.value.variants?.find((v: any) => v.id === selectedVariantId.value) || draft.value.variants?.[0],
@@ -260,22 +266,46 @@ function clean(set: any, key: string, event: Event) {
       ><template v-else
         ><label>Nome<input v-model="draft.name" required maxlength="100" autofocus /></label
         ><template v-if="kind === 'exercise'"
-          ><label>Descrizione<textarea v-model="draft.description" rows="2" maxlength="4000" /></label
-          ><label
-            >Tipologia esercizio<select v-model="draft.exerciseType">
-              <option value="bodyweight">Corpo libero</option>
-              <option value="weights">Pesi</option>
-            </select></label
-          >
-          <label
-            >Modalità di esecuzione<select
-              :value="draft.measurement || 'reps'"
-              @change="draft.measurement = ($event.target as HTMLSelectElement).value"
-            >
-              <option value="reps">A ripetizioni</option>
-              <option value="duration">Isometria - secondi</option>
-            </select></label
-          >
+          ><label>Descrizione<textarea v-model="draft.description" rows="2" maxlength="4000" /></label>
+          <fieldset class="exercise-choices">
+            <legend>Tipologia esercizio</legend>
+            <div class="exercise-choice-options">
+              <label
+                ><input
+                  v-model="draft.exerciseType"
+                  type="radio"
+                  name="exercise-type"
+                  value="bodyweight"
+                /><span>Corpo libero</span></label
+              >
+              <label
+                ><input v-model="draft.exerciseType" type="radio" name="exercise-type" value="weights" /><span
+                  >Pesi</span
+                ></label
+              >
+            </div>
+          </fieldset>
+          <fieldset class="exercise-choices">
+            <legend>Modalità di esecuzione</legend>
+            <div class="exercise-choice-options">
+              <label
+                ><input
+                  v-model="selectedMeasurement"
+                  type="radio"
+                  name="exercise-measurement"
+                  value="reps"
+                /><span>Ripetizioni</span></label
+              >
+              <label
+                ><input
+                  v-model="selectedMeasurement"
+                  type="radio"
+                  name="exercise-measurement"
+                  value="duration"
+                /><span>Isometria</span></label
+              >
+            </div>
+          </fieldset>
           <section aria-label="Muscoli target dell'esercizio">
             <h3>Muscoli target</h3>
             <MuscleTargets v-model="draft.muscleTargets" expanded />

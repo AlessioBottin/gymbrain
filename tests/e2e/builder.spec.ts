@@ -7,6 +7,11 @@ test('Builder: personal targets, multiple days, volume, offline draft and sessio
   await page.getByRole('button', { name: 'Prova sul dispositivo' }).click();
   await page.getByRole('button', { name: 'Usa percorso iniziale' }).click();
   await page.getByRole('button', { name: 'Esercizi', exact: true }).click();
+  await expect(page.getByRole('searchbox', { name: 'Cerca esercizi', exact: true })).toBeFocused();
+  await page.keyboard.type('Pull');
+  await expect(page.locator('.exercise-card')).toHaveCount(1);
+  await page.getByRole('searchbox', { name: 'Cerca esercizi', exact: true }).fill('');
+
   await page.getByRole('button', { name: 'Nuovo esercizio' }).click();
   const editor = page.getByRole('dialog', { name: 'UN NUOVO INIZIO' });
   await editor.getByLabel('Nome', { exact: true }).fill('Push test');
@@ -27,6 +32,11 @@ test('Builder: personal targets, multiple days, volume, offline draft and sessio
   await expect(editor.getByRole('combobox', { name: 'Deltoidi frontali', exact: true })).toHaveValue('0.7');
 
   await editor.getByRole('combobox', { name: 'Aggiungi gruppo muscolare' }).selectOption('back');
+  await expect(editor.getByRole('combobox', { name: 'Aggiungi gruppo muscolare' })).toHaveValue('back');
+  await expect(
+    editor.getByRole('combobox', { name: 'Aggiungi gruppo muscolare' }).locator('option:checked'),
+  ).toHaveText('Schiena (aggiunto)');
+
   await editor.getByRole('combobox', { name: 'Schiena', exact: true }).selectOption('0.5');
   await editor.getByRole('combobox', { name: 'Aggiungi gruppo muscolare' }).selectOption('erectors');
   await expect(editor.getByRole('combobox', { name: 'Lombari', exact: true })).toHaveValue('1');
@@ -134,7 +144,8 @@ test('Builder: personal targets, multiple days, volume, offline draft and sessio
   await addToUpper.click();
   const picker = page.getByRole('dialog', { name: 'AGGIUNGI ESERCIZIO', exact: true });
   await expect(picker.getByRole('heading', { name: 'Upper body', exact: true })).toBeVisible();
-  await picker.getByRole('searchbox', { name: 'Cerca esercizio' }).fill('non-esiste');
+  await expect(picker.getByRole('searchbox', { name: 'Cerca esercizio' })).toBeFocused();
+  await page.keyboard.type('non-esiste');
   await expect(picker.getByText('Nessun esercizio trovato.')).toBeVisible();
   await picker.getByRole('searchbox', { name: 'Cerca esercizio' }).fill('push');
   await expect(picker.locator('.builder-picker-item')).toHaveCount(1);
