@@ -384,37 +384,22 @@ async function save(): Promise<boolean> {
               @drop="dropOnDay($event, day.id)"
             >
               <div class="builder-day-heading">
-                <button
-                  type="button"
-                  class="icon-btn day-drag-handle"
-                  draggable="true"
-                  :aria-label="`Riordina giornata ${day.payload.name}`"
-                  title="Trascina per riordinare · Frecce sinistra/destra da tastiera"
-                  @dragstart="startDayDrag($event, day.id)"
-                  @dragend="endDayDrag"
-                  @keydown.left.prevent="moveDay(day.id, dayIndex - 1)"
-                  @keydown.right.prevent="moveDay(day.id, dayIndex + 1)"
-                >
-                  <svg width="18" height="22" viewBox="0 0 18 22" fill="currentColor" aria-hidden="true">
-                    <circle
-                      v-for="point in [
-                        [6, 5],
-                        [12, 5],
-                        [6, 11],
-                        [12, 11],
-                        [6, 17],
-                        [12, 17],
-                      ]"
-                      :key="point.join('-')"
-                      :cx="point[0]"
-                      :cy="point[1]"
-                      r="1.5"
-                    />
-                  </svg>
-                </button>
-                <label class="builder-day-name"
-                  >Giornata<input v-model="day.payload.name" maxlength="100" required
-                /></label>
+                <div class="builder-day-name">
+                  <button
+                    type="button"
+                    class="day-drag-handle"
+                    draggable="true"
+                    :aria-label="`Riordina giornata ${day.payload.name}`"
+                    title="Trascina per riordinare"
+                    @dragstart="startDayDrag($event, day.id)"
+                    @dragend="endDayDrag"
+                    @keydown.left.prevent="moveDay(day.id, dayIndex - 1)"
+                    @keydown.right.prevent="moveDay(day.id, dayIndex + 1)"
+                  >
+                    Giornata
+                  </button>
+                  <input v-model="day.payload.name" aria-label="Giornata" maxlength="100" required />
+                </div>
                 <button
                   type="button"
                   class="icon-btn builder-day-add"
@@ -756,13 +741,26 @@ async function save(): Promise<boolean> {
   margin: 4px 0 8px;
 }
 .day-drag-handle {
-  flex: none;
-  width: 26px;
-  height: 38px;
-  margin-bottom: 5px;
+  display: block;
+  width: fit-content;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  font: inherit;
+  text-align: left;
+  text-transform: none;
+  letter-spacing: inherit;
   cursor: grab;
-  color: var(--muted);
+  user-select: none;
+  color: inherit;
   background: transparent;
+}
+.day-drag-handle:hover {
+  background: transparent;
+  color: inherit;
 }
 .day-drag-handle:active {
   cursor: grabbing;
@@ -974,6 +972,12 @@ async function save(): Promise<boolean> {
 }
 .builder-day-name {
   margin-top: 0 !important;
+  margin-bottom: 16px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.builder-day-name input {
+  margin-top: 8px;
 }
 .builder-recap h3 {
   margin: 0;
