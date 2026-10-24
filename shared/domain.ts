@@ -125,6 +125,7 @@ export const exerciseSchema = z.preprocess(
     .object({
       name: z.string().trim().min(1).max(100),
       description: text,
+      isPublic: z.boolean().optional(),
       notes: text,
       exerciseType: exerciseTypeSchema,
       measurement: z.enum(['reps', 'duration']).optional(),

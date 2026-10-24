@@ -5,6 +5,7 @@ import fastifyStatic from '@fastify/static';
 import { resolve } from 'node:path';
 import { existsSync } from 'node:fs';
 import { createRecordsModule } from './modules/records.ts';
+import { createPublicCatalogModule } from './modules/publicCatalog.ts';
 import { localTransport, type Transport } from './lib/transport.ts';
 import { bearer, errors } from './lib/auth.ts';
 import { createMediaModule } from './modules/media.ts';
@@ -57,6 +58,7 @@ export async function createApp(
         createMediaModule(),
         createWithingsModule(),
         createWhoopModule(),
+        createPublicCatalogModule(),
       ];
   const transports = options.transports || {
     training: localTransport(modules[0]!),
@@ -64,6 +66,7 @@ export async function createApp(
     media: localTransport(modules[2]!),
     withings: localTransport(modules[3]!),
     whoop: localTransport(modules[4]!),
+    publicCatalog: localTransport(modules[5]!),
   };
   app.addHook('onClose', async () => {
     await Promise.all(modules.map((m) => m.close()));
@@ -218,6 +221,17 @@ export async function createApp(
         },
       });
     }
+  app.get('/api/public-catalog/exercises', async (req, reply) => {
+    reply.header('cache-control', 'no-store');
+    const token = bearer(req);
+    if (!token) return reply.code(401).send({ error: 'Accesso richiesto' });
+    const result = await transports.publicCatalog!.request({
+      method: 'GET',
+      path: '/exercises?page=' + encodeURIComponent(String((req.query as any).page || 0)),
+      token,
+    });
+    return reply.code(result.status).send(result.body);
+  });
   const root = options.staticRoot || resolve('.output/public');
   if (existsSync(root)) {
     await app.register(fastifyStatic, {

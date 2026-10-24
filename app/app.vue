@@ -2,6 +2,7 @@
 import { createClient, type SupabaseClient, type Session } from '@supabase/supabase-js';
 import { liveQuery } from 'dexie';
 import { useImmersiveMotion } from './composables/useImmersiveMotion';
+import { usePublicCatalog } from './composables/usePublicCatalog';
 import { db, saveRecord, synchronize, removeAccountCache, resolveConflict } from './lib/store';
 import { activeCycle, activePlan, comparePlanDates } from '../shared/cycles';
 import { freezeTargets } from '../shared/volume';
@@ -67,6 +68,49 @@ const withings = useWithings(auth, owner, local, online, sync);
 const whoop = useWhoop(auth, owner, local, online);
 useImmersiveMotion();
 const catalogSearch = ref<HTMLInputElement>();
+const sharedCatalog = usePublicCatalog(owner, catalogToken);
+const isSharedExercise = (row: LocalRecord) => row.user_id === 'public-catalog';
+async function copySharedExercise(row: LocalRecord) {
+  busy.value = true;
+  try {
+    await saveRecord(owner.value, 'exercise', { ...(row.payload as Exercise), isPublic: false });
+    await sync();
+    notify('Copia personale creata: puoi modificarla dalla lista esercizi.');
+  } catch (e: any) {
+    notify(e.message || 'Copia non riuscita.');
+  } finally {
+    busy.value = false;
+  }
+}
+async function catalogToken() {
+  if (!auth.value) return null;
+  const { data } = await auth.value.auth.getSession();
+  return data.session?.access_token || null;
+}
+async function toggleExerciseSharing(row: LocalRecord) {
+  if (!online.value || local.value) {
+    toast.value = 'Accedi online per condividere gli esercizi.';
+    return;
+  }
+  busy.value = true;
+  try {
+    const payload = row.payload as Exercise;
+    await saveRecord(
+      owner.value,
+      'exercise',
+      { ...payload, isPublic: !payload.isPublic },
+      { id: row.id, expectedRevision: row.localRevision },
+    );
+    await sync();
+    toast.value = payload.isPublic
+      ? 'Esercizio reso privato.'
+      : 'Condivisione salvata. Il catalogo pubblico si aggiorna dopo la sincronizzazione.';
+  } catch (e: any) {
+    toast.value = e.message || 'Condivisione non riuscita.';
+  } finally {
+    busy.value = false;
+  }
+}
 watch(catalogSearch, (input) => input?.focus({ preventScroll: true }), { flush: 'post' });
 watch(view, async () => {
   await nextTick();
@@ -103,7 +147,11 @@ function localToday() {
     String(now.getDate()).padStart(2, '0'),
   ].join('-');
 }
-const catalog = computed(() => rows.value.filter((r) => r.kind === 'exercise' && !r.deleted)),
+const catalog = computed(() => {
+    const own = rows.value.filter((r) => r.kind === 'exercise' && !r.deleted);
+    const ownIds = new Set(rows.value.filter((r) => r.kind === 'exercise').map((r) => r.id));
+    return [...own, ...sharedCatalog.records.value.filter((r) => !ownIds.has(r.id))];
+  }),
   cycles = computed(() => rows.value.filter((r) => r.kind === 'cycle' && !r.deleted)),
   cycle = computed(() => {
     return (
@@ -240,6 +288,7 @@ async function sync() {
           if (owner.value === id) status.value = s;
         },
       );
+      await sharedCatalog.refresh();
     } finally {
       syncing = false;
       syncTask = undefined;
@@ -1090,6 +1139,10 @@ const date = (value: string) =>
                   Nuovo esercizio <GIcon name="plus" />
                 </button>
               </div>
+              <p v-if="sharedCatalog.message.value" role="status">
+                {{ sharedCatalog.message.value }}
+                <button class="text-btn" @click="sharedCatalog.refresh">Riprova</button>
+              </p>
               <input
                 ref="catalogSearch"
                 v-model="search"
@@ -1107,6 +1160,7 @@ const date = (value: string) =>
                     </div>
                     <button
                       class="icon-btn"
+                      v-if="!isSharedExercise(e)"
                       :aria-label="'Modifica ' + (e.payload as Exercise).name"
                       @click="openEditor('exercise', e)"
                     >
@@ -1117,12 +1171,26 @@ const date = (value: string) =>
                     (e.payload as Exercise).exerciseType === 'weights' ? 'Pesi' : 'Corpo libero'
                   }}</span>
                   <h2>{{ (e.payload as Exercise).name }}</h2>
+                  <span v-if="isSharedExercise(e)" class="subtle">Condiviso</span>
                   <p v-if="(e.payload as Exercise).variants?.length" class="subtle">
                     {{ (e.payload as Exercise).variants.map((v) => v.name).join(' / ') }}
                   </p>
                   <p class="subtle">{{ (e.payload as Exercise).description }}</p>
                   <p class="subtle">{{ (e.payload as Exercise).notes }}</p>
-                  <div class="card-tools">
+                  <div v-if="isSharedExercise(e)" class="card-tools">
+                    <button class="text-btn" :disabled="busy || !online" @click="copySharedExercise(e)">
+                      Crea copia personale
+                    </button>
+                  </div>
+                  <div v-else class="card-tools">
+                    <button
+                      class="text-btn"
+                      :disabled="busy || local || !online"
+                      @click="toggleExerciseSharing(e)"
+                      :aria-label="`${(e.payload as Exercise).isPublic ? 'Rendi privato' : 'Rendi pubblico'} ${(e.payload as Exercise).name}`"
+                    >
+                      {{ (e.payload as Exercise).isPublic ? 'Pubblico · Rendi privato' : 'Rendi pubblico' }}
+                    </button>
                     <button
                       v-if="(e.payload as Exercise).videoPath || (e.payload as Exercise).videoUrl"
                       class="text-btn"
