@@ -32,6 +32,8 @@ const selectedMeasurement = computed({
     draft.value.measurement = value;
   },
 });
+const descriptionOpen = ref(false),
+  videoLinkOpen = ref(false);
 const selectedVariantId = ref('');
 const selectedVariant = computed(
   () => draft.value.variants?.find((v: any) => v.id === selectedVariantId.value) || draft.value.variants?.[0],
@@ -101,6 +103,8 @@ watch(
     variantDraft.value = undefined;
     targetsOpen.value = false;
     if (!value) return;
+    descriptionOpen.value = false;
+    videoLinkOpen.value = false;
     error.value = '';
     selectedExercise.value = '';
     selectedVariantId.value = '';
@@ -266,7 +270,15 @@ function clean(set: any, key: string, event: Event) {
       ><template v-else
         ><label>Nome<input v-model="draft.name" required maxlength="100" autofocus /></label
         ><template v-if="kind === 'exercise'"
-          ><label>Descrizione<textarea v-model="draft.description" rows="2" maxlength="4000" /></label>
+          ><button
+            v-if="!descriptionOpen && !draft.description"
+            type="button"
+            class="text-btn optional-field-add"
+            @click="descriptionOpen = true"
+          >
+            + Aggiungi descrizione
+          </button>
+          <label v-else>Descrizione<textarea v-model="draft.description" rows="2" maxlength="4000" /></label>
           <fieldset class="exercise-choices">
             <legend>Tipologia esercizio</legend>
             <div class="exercise-choice-options">
@@ -356,7 +368,15 @@ function clean(set: any, key: string, event: Event) {
               Aggiungi variante +
             </button>
           </fieldset>
-          <label
+          <button
+            v-if="!videoLinkOpen && !draft.videoUrl"
+            type="button"
+            class="text-btn optional-field-add"
+            @click="videoLinkOpen = true"
+          >
+            + Aggiungi link video
+          </button>
+          <label v-else
             >Video dimostrativo · link HTTPS<input
               v-model="draft.videoUrl"
               type="url"
