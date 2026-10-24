@@ -13,9 +13,17 @@ test('Dragging days persists their order and keeps prescriptions on their day', 
   await expect(days.first()).toContainText('Sovraccarico: 10 kg');
   await expect(days.nth(1)).toContainText('Carico: 60 kg');
   await expect(days.last()).toContainText('Elastico: Assistenza media');
-  await builder
-    .getByRole('button', { name: 'Riordina giornata Upper body', exact: true })
-    .dragTo(days.last().locator('.builder-day-heading'));
+  const handle = builder.getByRole('button', { name: 'Riordina giornata Upper body', exact: true });
+  await handle.hover();
+  const source = (await handle.boundingBox())!;
+  const destination = (await days.last().locator('.day-drag-handle').boundingBox())!;
+  await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(destination.x + destination.width / 2, destination.y + destination.height / 2, {
+    steps: 20,
+  });
+  await page.mouse.move(destination.x + destination.width / 2, destination.y + destination.height / 2 + 2);
+  await page.mouse.up();
   await expect(names.first()).toHaveValue('Lower body');
   await expect(names.last()).toHaveValue('Upper body');
   await expect(days.last()).toContainText('Sovraccarico: 10 kg');
