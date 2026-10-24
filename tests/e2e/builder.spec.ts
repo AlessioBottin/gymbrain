@@ -18,27 +18,27 @@ test('Builder: personal targets, multiple days, volume, offline draft and sessio
   await expect(editor.getByRole('heading', { name: 'Muscoli target', exact: true })).toBeVisible();
   await expect(editor.locator('.muscle-targets summary')).toHaveCount(0);
   await expect(editor.getByRole('combobox', { name: 'Petto', exact: true })).toHaveCount(0);
-  await editor.getByRole('combobox', { name: 'Aggiungi gruppo muscolare' }).selectOption('chest');
-  await editor.getByRole('combobox', { name: 'Aggiungi gruppo muscolare' }).selectOption('triceps');
+  await editor.getByRole('combobox', { name: 'Aggiungi muscolo' }).selectOption('chest');
+  await editor.getByRole('combobox', { name: 'Aggiungi muscolo' }).selectOption('triceps');
   await editor.getByRole('combobox', { name: 'Tricipiti', exact: true }).selectOption('0');
   await expect(editor.getByRole('combobox', { name: 'Tricipiti', exact: true })).toHaveCount(0);
-  await editor.getByRole('combobox', { name: 'Aggiungi gruppo muscolare' }).selectOption('triceps');
+  await editor.getByRole('combobox', { name: 'Aggiungi muscolo' }).selectOption('triceps');
   await editor.getByRole('combobox', { name: 'Tricipiti', exact: true }).selectOption('0.5');
-  await editor.getByRole('combobox', { name: 'Aggiungi gruppo muscolare' }).selectOption('frontDelts');
+  await editor.getByRole('combobox', { name: 'Aggiungi muscolo' }).selectOption('frontDelts');
   await editor.getByRole('combobox', { name: 'Deltoidi frontali', exact: true }).selectOption('0.7');
-  await editor.getByRole('combobox', { name: 'Aggiungi gruppo muscolare' }).selectOption('sideDelts');
+  await editor.getByRole('combobox', { name: 'Aggiungi muscolo' }).selectOption('sideDelts');
   await editor.getByRole('combobox', { name: 'Deltoidi laterali', exact: true }).selectOption('0.3');
   await expect(editor.getByRole('combobox', { name: 'Petto', exact: true })).toHaveValue('1');
   await expect(editor.getByRole('combobox', { name: 'Deltoidi frontali', exact: true })).toHaveValue('0.7');
 
-  await editor.getByRole('combobox', { name: 'Aggiungi gruppo muscolare' }).selectOption('back');
-  await expect(editor.getByRole('combobox', { name: 'Aggiungi gruppo muscolare' })).toHaveValue('back');
+  await editor.getByRole('combobox', { name: 'Aggiungi muscolo' }).selectOption('back');
+  await expect(editor.getByRole('combobox', { name: 'Aggiungi muscolo' })).toHaveValue('back');
   await expect(
-    editor.getByRole('combobox', { name: 'Aggiungi gruppo muscolare' }).locator('option:checked'),
+    editor.getByRole('combobox', { name: 'Aggiungi muscolo' }).locator('option:checked'),
   ).toHaveText('Schiena (aggiunto)');
 
   await editor.getByRole('combobox', { name: 'Schiena', exact: true }).selectOption('0.5');
-  await editor.getByRole('combobox', { name: 'Aggiungi gruppo muscolare' }).selectOption('erectors');
+  await editor.getByRole('combobox', { name: 'Aggiungi muscolo' }).selectOption('erectors');
   await expect(editor.getByRole('combobox', { name: 'Lombari', exact: true })).toHaveValue('1');
   await expect(editor.getByRole('combobox', { name: 'Petto', exact: true })).toHaveValue('1');
   const variantEditor = page.getByRole('dialog', { name: 'VARIANTE DEL MOVIMENTO', exact: true });

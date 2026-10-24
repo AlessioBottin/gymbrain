@@ -30,14 +30,10 @@ function change(m: Muscle, event: Event) {
 <template>
   <component :is="expanded ? 'div' : 'details'" class="muscle-targets">
     <summary v-if="!expanded">
-      {{ inherited ? 'Target variante (eredita se vuoto)' : 'La tua filosofia: target muscolari' }}
+      {{ inherited ? 'Target variante' : 'Muscoli target' }}
     </summary>
-    <p class="notice">
-      Puoi aggiungere più gruppi muscolari allo stesso esercizio. Ogni serie conta da 0 a 1 per ciascun
-      muscolo, con coefficienti indipendenti.
-    </p>
     <label
-      >Aggiungi gruppo muscolare
+      >Aggiungi muscolo
       <select :value="addedMuscle" @change="addMuscle">
         <option value="">Scegli un muscolo</option>
         <option v-for="m in muscles" :key="m" :value="m" :disabled="effective(m) > 0">
@@ -45,17 +41,12 @@ function change(m: Muscle, event: Event) {
         </option>
       </select>
     </label>
-    <p v-if="!activeMuscles.length" class="notice">Nessun target attivo. Aggiungi i muscoli allenati.</p>
     <div class="muscle-grid">
       <label v-for="m in activeMuscles" :key="m"
         >{{ muscleGroups[m] }}
         <select :value="ownTargets?.[m] ?? ''" @change="change(m, $event)">
           <option value="">
-            {{
-              inherited
-                ? 'Eredita: ' + (inheritedTargets?.[m] ?? 0).toLocaleString('it-IT')
-                : 'Non impostato (0)'
-            }}
+            {{ inherited ? 'Eredita: ' + (inheritedTargets?.[m] ?? 0).toLocaleString('it-IT') : '0' }}
           </option>
           <option v-for="n in 11" :key="n" :value="(n - 1) / 10">
             {{ ((n - 1) / 10).toLocaleString('it-IT') }}

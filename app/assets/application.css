@@ -777,3 +777,28 @@ dialog:has(.program-builder) .modal-top {
   padding: 6px 0;
   margin: 4px 0 10px;
 }
+
+.muscle-targets {
+  padding: 0;
+  border: 0;
+}
+.muscle-targets .muscle-grid {
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+.muscle-targets .muscle-grid label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+}
+.muscle-targets .muscle-grid select {
+  width: auto;
+  min-width: 84px;
+  max-width: 160px;
+  flex-shrink: 0;
+  min-height: 34px;
+  padding: 6px 8px;
+  margin: 0;
+}
