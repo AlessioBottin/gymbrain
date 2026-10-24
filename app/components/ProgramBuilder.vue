@@ -8,7 +8,7 @@ import {
   type Exercise,
   type Prescription,
 } from '../../shared/domain';
-import { setLoad } from '../../shared/setDefaults';
+import { setLoad, setAssistance } from '../../shared/setDefaults';
 import { makePrescription } from '../../shared/volume';
 import { savePlanWorkouts } from '../lib/store';
 const props = defineProps<{
@@ -33,6 +33,44 @@ const editExercises = ref<Prescription[]>([]),
 const settingsError = ref('');
 const destinationDayId = ref('');
 const dayMenuOpen = ref(false);
+const draggedDay = ref('');
+const dropDay = ref('');
+const reorderAnnouncement = ref('');
+function endDayDrag() {
+  draggedDay.value = '';
+  dropDay.value = '';
+}
+function moveDay(id: string, destination: number) {
+  const source = days.value.findIndex((day) => day.id === id);
+  if (source < 0 || destination < 0 || destination >= days.value.length || source === destination) return;
+  const [day] = days.value.splice(source, 1);
+  days.value.splice(destination, 0, day!);
+  days.value.forEach((item, index) => {
+    item.payload.order = index;
+  });
+  reorderAnnouncement.value = `${day!.payload.name}: posizione ${destination + 1} di ${days.value.length}`;
+}
+function startDayDrag(event: DragEvent, id: string) {
+  if (!event.dataTransfer) return;
+  draggedDay.value = id;
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', id);
+}
+function overDay(event: DragEvent, id: string) {
+  if (!draggedDay.value) return;
+  event.preventDefault();
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+  dropDay.value = id;
+}
+function dropOnDay(event: DragEvent, id: string) {
+  if (!draggedDay.value) return;
+  event.preventDefault();
+  moveDay(
+    draggedDay.value,
+    days.value.findIndex((day) => day.id === id),
+  );
+  endDayDrag();
+}
 const pickerDay = computed(() => days.value.find((day) => day.id === pickerDayId.value));
 const editExercise = computed(() => editExercises.value[editIndex.value]);
 const pickerExercises = computed(() => {
@@ -118,6 +156,7 @@ const savedContent = ref('');
 watch(
   () => props.open,
   (value) => {
+    endDayDrag();
     pickerDayId.value = '';
     if (!value) return;
     error.value = '';
@@ -252,12 +291,24 @@ function techniqueSummary(e: Prescription) {
   const labels: string[] = [
     ...new Set(
       e.sets.map((s) =>
-        s.technique === 'cluster' ? 'Cluster' : s.technique === 'drop' ? 'Drop' : 'Standard',
+        s.technique === 'cluster' ? 'Cluster set' : s.technique === 'drop' ? 'Drop set' : 'Standard',
       ),
     ),
   ];
   if (e.group) labels.unshift(e.group.type === 'jump' ? 'Jump set' : 'Superset');
   return labels.join(' · ');
+}
+function firstSetEquipment(e: Prescription) {
+  const details: string[] = [];
+  const load = e.sets[0]?.load;
+  if (load != null && (load > 0 || e.exerciseType === 'weights'))
+    details.push(
+      `${e.exerciseType === 'bodyweight' ? 'Sovraccarico' : 'Carico'}: ${load.toLocaleString('it-IT')} kg`,
+    );
+  const bands = setAssistance(e.sets, 0, e.assistance);
+  if (bands.length) details.push(`Elastico: ${bands.map((band) => band.name).join(' + ')}`);
+  else if (e.band && e.sets[0]?.assistance === undefined) details.push(`Elastico: ${e.band}`);
+  return details.join(' · ');
 }
 async function save(): Promise<boolean> {
   if (pendingSave) return pendingSave;
@@ -316,12 +367,51 @@ async function save(): Promise<boolean> {
         </button>
       </header>
       <p role="status" class="draft-status">{{ saveStatus }}</p>
+      <span class="day-reorder-announcement" role="status" aria-live="polite">{{ reorderAnnouncement }}</span>
       <p v-if="!catalog.length">Crea i tuoi esercizi nel catalogo per aggiungerli qui.</p>
       <div class="builder-layout">
         <div class="builder-board" role="region" aria-label="Giornate della scheda affiancate" tabindex="0">
           <div class="builder-days">
-            <section v-for="day in days" :key="day.id" class="builder-day">
+            <section
+              v-for="(day, dayIndex) in days"
+              :key="day.id"
+              class="builder-day"
+              :class="{
+                'day-dragging': draggedDay === day.id,
+                'day-drop-target': dropDay === day.id && draggedDay !== day.id,
+              }"
+              @dragover="overDay($event, day.id)"
+              @drop="dropOnDay($event, day.id)"
+            >
               <div class="builder-day-heading">
+                <button
+                  type="button"
+                  class="icon-btn day-drag-handle"
+                  draggable="true"
+                  :aria-label="`Riordina giornata ${day.payload.name}`"
+                  title="Trascina per riordinare · Frecce sinistra/destra da tastiera"
+                  @dragstart="startDayDrag($event, day.id)"
+                  @dragend="endDayDrag"
+                  @keydown.left.prevent="moveDay(day.id, dayIndex - 1)"
+                  @keydown.right.prevent="moveDay(day.id, dayIndex + 1)"
+                >
+                  <svg width="18" height="22" viewBox="0 0 18 22" fill="currentColor" aria-hidden="true">
+                    <circle
+                      v-for="point in [
+                        [6, 5],
+                        [12, 5],
+                        [6, 11],
+                        [12, 11],
+                        [6, 17],
+                        [12, 17],
+                      ]"
+                      :key="point.join('-')"
+                      :cx="point[0]"
+                      :cy="point[1]"
+                      r="1.5"
+                    />
+                  </svg>
+                </button>
                 <label class="builder-day-name"
                   >Giornata<input v-model="day.payload.name" maxlength="100" required
                 /></label>
@@ -351,6 +441,9 @@ async function save(): Promise<boolean> {
                 <p class="builder-prescription">
                   <strong>{{ e.sets.length }} × {{ repsSummary(e) }}</strong>
                   {{ e.measurement === 'duration' ? 's' : 'rep' }}
+                </p>
+                <p v-if="firstSetEquipment(e)" class="builder-equipment">
+                  <span>1ª serie · </span>{{ firstSetEquipment(e) }}
                 </p>
                 <div class="builder-exercise-actions">
                   <button
@@ -655,6 +748,38 @@ async function save(): Promise<boolean> {
   display: flex;
   align-items: end;
   gap: 8px;
+}
+.builder-equipment {
+  font-size: 0.8rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  margin: 4px 0 8px;
+}
+.day-drag-handle {
+  flex: none;
+  width: 26px;
+  height: 38px;
+  margin-bottom: 5px;
+  cursor: grab;
+  color: var(--muted);
+  background: transparent;
+}
+.day-drag-handle:active {
+  cursor: grabbing;
+}
+.builder-day.day-dragging {
+  opacity: 0.5;
+}
+.builder-day.day-drop-target {
+  outline: 2px solid var(--lime);
+  outline-offset: 3px;
+}
+.day-reorder-announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
 .builder-day-heading .builder-day-name {
   flex: 1;
