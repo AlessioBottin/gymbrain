@@ -43,7 +43,8 @@ export const muscleGroups = {
   hamstrings: 'Femorali',
   quads: 'Quadricipiti',
   calves: 'Polpacci',
-  back: 'Schiena',
+  lats: 'Dorsali',
+  rhomboids: 'Romboidi',
   rearDelts: 'Deltoidi posteriori',
   traps: 'Trapezi',
   biceps: 'Bicipiti',
@@ -59,10 +60,14 @@ export const muscleGroups = {
 export type Muscle = keyof typeof muscleGroups;
 export function normalizeMuscleTargets(value: unknown) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
-  const { frontSideDelts, ...targets } = value as Record<string, unknown>;
+  const { frontSideDelts, back, ...targets } = value as Record<string, unknown>;
   if (frontSideDelts !== undefined) {
     if (targets.frontDelts === undefined) targets.frontDelts = frontSideDelts;
     if (targets.sideDelts === undefined) targets.sideDelts = frontSideDelts;
+  }
+  if (back !== undefined) {
+    if (targets.lats === undefined) targets.lats = back;
+    if (targets.rhomboids === undefined) targets.rhomboids = back;
   }
   return targets;
 }

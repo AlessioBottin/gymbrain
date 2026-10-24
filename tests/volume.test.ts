@@ -124,3 +124,20 @@ test('Legacy deltoid targets split without overwriting explicit targets or varia
   assert.equal(volume([p]).frontDelts, 0.5);
   assert.equal(volume([p]).sideDelts, 0.5);
 });
+
+test('Back targets split into lats and rhomboids with independent volume and overrides', () => {
+  assert.deepEqual(muscleTargetsSchema.parse({ back: 0.5 }), { lats: 0.5, rhomboids: 0.5 });
+  assert.deepEqual(muscleTargetsSchema.parse({ back: 0.5, rhomboids: 0 }), { lats: 0.5, rhomboids: 0 });
+  assert.deepEqual(effectiveTargets({ back: 1 } as any, { rhomboids: 0.3 }), { lats: 1, rhomboids: 0.3 });
+  assert.deepEqual(effectiveTargets({ lats: 1, rhomboids: 0.5 }, { back: 0 } as any), {
+    lats: 0,
+    rhomboids: 0,
+  });
+  const p = makePrescription(exercise('Row', { lats: 1, rhomboids: 0.5 }));
+  p.sets.push({ ...p.sets[0]! });
+  assert.equal(volume([p]).lats, 2);
+  assert.equal(volume([p]).rhomboids, 1);
+  p.muscleTargets = { back: 0.5 } as any;
+  assert.equal(volume([p]).lats, 1);
+  assert.equal(volume([p]).rhomboids, 1);
+});

@@ -36,14 +36,18 @@ test('Builder: personal targets, multiple days, volume, offline draft and sessio
   await expect(editor.getByRole('combobox', { name: 'Petto', exact: true })).toHaveValue('1');
   await expect(editor.getByRole('combobox', { name: 'Deltoidi frontali', exact: true })).toHaveValue('0.7');
 
-  await editor.getByRole('combobox', { name: 'Target muscolari' }).selectOption('back');
+  await editor.getByRole('combobox', { name: 'Target muscolari' }).selectOption('lats');
   await editor.getByRole('button', { name: 'Aggiungi target muscolare', exact: true }).click();
-  await expect(editor.getByRole('combobox', { name: 'Target muscolari' })).toHaveValue('back');
+  await expect(editor.getByRole('combobox', { name: 'Target muscolari' })).toHaveValue('lats');
   await expect(
     editor.getByRole('combobox', { name: 'Target muscolari' }).locator('option:checked'),
-  ).toHaveText('Schiena (aggiunto)');
+  ).toHaveText('Dorsali (aggiunto)');
 
-  await editor.getByRole('combobox', { name: 'Schiena', exact: true }).selectOption('0.5');
+  await editor.getByRole('combobox', { name: 'Dorsali', exact: true }).selectOption('0.5');
+  await editor.getByRole('combobox', { name: 'Target muscolari' }).selectOption('rhomboids');
+  await editor.getByRole('button', { name: 'Aggiungi target muscolare', exact: true }).click();
+  await editor.getByRole('combobox', { name: 'Romboidi', exact: true }).selectOption('0.3');
+
   await editor.getByRole('combobox', { name: 'Target muscolari' }).selectOption('erectors');
   await editor.getByRole('button', { name: 'Aggiungi target muscolare', exact: true }).click();
   await expect(editor.getByRole('combobox', { name: 'Lombari', exact: true })).toHaveValue('1');
@@ -85,7 +89,8 @@ test('Builder: personal targets, multiple days, volume, offline draft and sessio
   await expect(editor).not.toBeVisible();
   await page.getByRole('button', { name: 'Modifica Push test', exact: true }).click();
   const reopenedEditor = page.getByRole('dialog', { name: 'PERSONALIZZA IL TUO PERCORSO' });
-  await expect(reopenedEditor.getByRole('combobox', { name: 'Schiena', exact: true })).toHaveValue('0.5');
+  await expect(reopenedEditor.getByRole('combobox', { name: 'Dorsali', exact: true })).toHaveValue('0.5');
+  await expect(reopenedEditor.getByRole('combobox', { name: 'Romboidi', exact: true })).toHaveValue('0.3');
   await expect(reopenedEditor.getByRole('combobox', { name: 'Lombari', exact: true })).toHaveValue('1');
   await expect(
     reopenedEditor.getByRole('combobox', { name: 'Variante da modificare' }).locator('option'),
