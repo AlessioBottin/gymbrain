@@ -8,8 +8,18 @@ const segmentSchema = z
   .object({ reps: number, tut: number, load: number, restSeconds: restSeconds.optional() })
   .strict();
 export const groupSchema = z.object({ id: uuid, type: z.enum(['jump', 'superset']), restSeconds }).strict();
+export const bandSchema = z
+  .object({
+    id: z.string().max(100),
+    name: z.string().max(100),
+    minKg: z.number().nonnegative().max(500),
+    maxKg: z.number().positive().max(500),
+  })
+  .strict()
+  .refine((b) => b.minKg <= b.maxKg);
 const targetFields = z
   .object({
+    assistance: z.array(bandSchema).max(8).optional(),
     countVolume: z.boolean().optional(),
     restSeconds: restSeconds.optional(),
     technique: z.enum(['standard', 'cluster', 'drop']).optional(),
@@ -91,15 +101,6 @@ export const variantSchema = z
     muscleTargets: muscleTargetsSchema.optional(),
   })
   .strict();
-export const bandSchema = z
-  .object({
-    id: z.string().max(100),
-    name: z.string().max(100),
-    minKg: z.number().nonnegative().max(500),
-    maxKg: z.number().positive().max(500),
-  })
-  .strict()
-  .refine((b) => b.minKg <= b.maxKg);
 export function normalizeExercise(value: any) {
   if (!value || typeof value !== 'object') return value;
   const { mode, ...rest } = value;
@@ -139,6 +140,7 @@ const prescriptionFields = z
     id: uuid,
     exerciseId: uuid,
     group: groupSchema.optional(),
+    restSeconds: restSeconds.optional(),
     name: z.string().min(1).max(100),
     notes: text,
     mode: loadModeSchema,
@@ -360,7 +362,12 @@ export function snapshotSession(workout: LocalRecord, bodyWeight: number | null)
       originalVariant: e.variant ? { ...e.variant } : null,
       originalAssistance: e.assistance.map((b) => ({ ...b })),
       targetSets: JSON.parse(JSON.stringify(e.sets)),
-      actual: e.sets.map((target) => ({
+      actual: e.sets.map((target, index) => ({
+        assistance: target.assistance
+          ? structuredClone(target.assistance)
+          : index === 0
+            ? structuredClone(e.assistance)
+            : undefined,
         countVolume: target.countVolume,
         technique: target.technique,
         restSeconds: target.restSeconds,

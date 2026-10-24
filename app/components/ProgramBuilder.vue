@@ -8,6 +8,7 @@ import {
   type Exercise,
   type Prescription,
 } from '../../shared/domain';
+import { setLoad } from '../../shared/setDefaults';
 import { makePrescription } from '../../shared/volume';
 import { savePlanWorkouts } from '../lib/store';
 const props = defineProps<{
@@ -230,7 +231,10 @@ function setCount(e: Prescription, event: Event) {
   const count = Number((event.target as HTMLInputElement).value);
   if (!Number.isInteger(count) || count < 1 || count > 30) return;
   while (e.sets.length < count)
-    e.sets.push(JSON.parse(JSON.stringify(e.sets.at(-1) || newTarget(e.measurement))));
+    e.sets.push({
+      ...JSON.parse(JSON.stringify(e.sets[0] || newTarget(e.measurement))),
+      assistance: undefined,
+    });
   e.sets.splice(count);
 }
 function repsSummary(e: Prescription) {
@@ -561,11 +565,8 @@ async function save(): Promise<boolean> {
             @change="setCount(editExercise, $event)"
         /></label>
         <ExerciseGroup :exercise="editExercise" :exercises="editExercises" />
-        <label>Note esercizio<textarea v-model="editExercise.notes" maxlength="4000" rows="2" /></label>
-        <AssistancePicker
-          v-if="editExercise.exerciseType === 'bodyweight'"
-          v-model="editExercise.assistance"
-        />
+        <ExerciseRest :exercise="editExercise" />
+        <OptionalNotes v-model="editExercise.notes" label="Note esercizio" />
         <fieldset v-for="(set, index) in editExercise.sets" :key="index" class="builder-set">
           <legend>Serie {{ index + 1 }}</legend>
           <label class="builder-check"
@@ -592,7 +593,7 @@ async function save(): Promise<boolean> {
                 :min="0"
                 :max="2000"
                 :step="0.5"
-                @commit="set.load = $event"
+                @commit="setLoad(editExercise.sets, index, $event)"
             /></label>
             <label
               >RPE<StableNumberInput
@@ -606,6 +607,12 @@ async function save(): Promise<boolean> {
               >RIR<StableNumberInput :value="set.rir" :min="0" :max="10" :step="1" @commit="set.rir = $event"
             /></label>
           </div>
+          <SetAssistance
+            v-if="editExercise.exerciseType === 'bodyweight'"
+            :sets="editExercise.sets"
+            :index="index"
+            :fallback="editExercise.assistance"
+          />
           <SetTechnique :set="set" :measurement="editExercise.measurement" />
         </fieldset>
         <p v-if="settingsError" role="alert">{{ settingsError }}</p>

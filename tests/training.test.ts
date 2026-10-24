@@ -10,6 +10,7 @@ import {
   type LocalRecord,
 } from '../shared/domain.ts';
 import { trainingSequence, nextTrainingStep } from '../shared/training.ts';
+import { setAssistance, setLoad } from '../shared/setDefaults.ts';
 import { volume } from '../shared/volume.ts';
 function exercise(name: string): Prescription {
   return {
@@ -98,4 +99,67 @@ test('Cluster/drop pass validation, snapshot, progress and volume count the whol
   assert.equal(targetSchema.safeParse(drop).success, false);
   drop.segments![1]!.load = 40;
   assert.equal(targetSchema.safeParse(drop).success, true);
+});
+
+test('Exercise rest overrides legacy per-set rests and survives the session snapshot', () => {
+  const e = exercise('Pull');
+  e.restSeconds = 75;
+  e.sets[0]!.restSeconds = 10;
+  e.sets[1]!.restSeconds = 20;
+  assert.deepEqual(
+    trainingSequence([e]).map((s) => s.restSeconds),
+    [75, 75],
+  );
+  const session = snapshotSession(
+    {
+      id: crypto.randomUUID(),
+      parent_id: crypto.randomUUID(),
+      payload: { name: 'Day', notes: '', order: 0, exercises: [e] },
+    } as LocalRecord,
+    75,
+  );
+  assert.equal(nextTrainingStep(session)?.restSeconds, 75);
+});
+test('Set bands inherit first-set settings, preserve overrides, and snapshot legacy defaults', () => {
+  const band = { id: 'light', name: 'Light', minKg: 5, maxKg: 10 };
+  const other = { id: 'medium', name: 'Medium', minKg: 10, maxKg: 20 };
+  const e = exercise('Pull');
+  e.assistance = [band];
+  e.sets.push(newTarget());
+  assert.deepEqual(setAssistance(e.sets, 1, e.assistance), [band]);
+  e.sets[0]!.assistance = [other];
+  e.sets[2]!.assistance = [];
+  assert.deepEqual(setAssistance(e.sets, 1, e.assistance), [other]);
+  assert.deepEqual(setAssistance(e.sets, 2, e.assistance), []);
+  const session = snapshotSession(
+    {
+      id: crypto.randomUUID(),
+      parent_id: crypto.randomUUID(),
+      payload: { name: 'Day', notes: '', order: 0, exercises: [e] },
+    } as LocalRecord,
+    75,
+  );
+  const actual = session.exercises[0]!.actual;
+  assert.deepEqual(setAssistance(actual, 1), [other]);
+  assert.deepEqual(setAssistance(actual, 2), []);
+  e.sets[0]!.assistance[0]!.name = 'Changed';
+  assert.equal(setAssistance(actual, 1)[0]!.name, 'Medium');
+});
+test('First-set load propagates to inherited values without changing overrides or completed sets', () => {
+  const sets = [
+    newTarget(),
+    newTarget(),
+    { ...newTarget(), load: 20 },
+    { ...newTarget(), load: 5, done: true },
+  ];
+  setLoad(sets, 0, 10);
+  assert.deepEqual(
+    sets.map((s) => s.load),
+    [10, 10, 20, 5],
+  );
+  setLoad(sets, 0, 15);
+  assert.deepEqual(
+    sets.map((s) => s.load),
+    [15, 15, 20, 5],
+  );
 });

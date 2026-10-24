@@ -7,55 +7,92 @@ const ownTargets = computed(() => normalizeMuscleTargets(props.modelValue) as Mu
 const inheritedTargets = computed(() => normalizeMuscleTargets(props.inherited) as MuscleTargets | undefined);
 const effective = (m: Muscle) => ownTargets.value?.[m] ?? inheritedTargets.value?.[m] ?? 0;
 const activeMuscles = computed(() => muscles.filter((m) => effective(m) > 0));
-const addedMuscle = ref<Muscle | ''>('');
-
-function addMuscle() {
-  const m = addedMuscle.value as Muscle;
-  if (muscles.includes(m) && effective(m) === 0) {
-    addedMuscle.value = m;
-    emit('update:modelValue', { ...ownTargets.value, [m]: 1 });
-  }
+const menuOpen = ref(false);
+const selectedMuscle = ref<Muscle | ''>('');
+const coefficient = ref<number | ''>(1);
+const editing = ref(false);
+function openTarget(m?: Muscle) {
+  editing.value = !!m;
+  selectedMuscle.value = m || '';
+  coefficient.value = m ? (ownTargets.value?.[m] ?? '') : 1;
+  menuOpen.value = true;
 }
-function change(m: Muscle, event: Event) {
-  const value = (event.target as HTMLSelectElement).value;
+function confirmTarget() {
+  const m = selectedMuscle.value;
+  if (!m || (!editing.value && effective(m) > 0)) return;
   const next = { ...ownTargets.value };
-  if (value === '') delete next[m];
-  else next[m] = Number(value);
+  if (coefficient.value === '') delete next[m];
+  else next[m] = Number(coefficient.value);
   emit('update:modelValue', next);
+  menuOpen.value = false;
+}
+function removeTarget(m: Muscle) {
+  emit('update:modelValue', { ...ownTargets.value, [m]: 0 });
 }
 </script>
 <template>
   <component :is="expanded ? 'div' : 'details'" class="muscle-targets">
     <summary v-if="!expanded">Target muscolari</summary>
-    <div class="selector-add-row">
-      <select v-model="addedMuscle" aria-label="Target muscolari">
-        <option value="">Seleziona muscolo</option>
-        <option v-for="m in muscles" :key="m" :value="m" :disabled="effective(m) > 0">
-          {{ muscleGroups[m] }}{{ effective(m) > 0 ? ' (aggiunto)' : '' }}
-        </option>
-      </select>
-      <button
-        type="button"
-        class="secondary compact-add"
-        aria-label="Aggiungi target muscolare"
-        :disabled="!addedMuscle || effective(addedMuscle) > 0"
-        @click="addMuscle"
-      >
-        Aggiungi
-      </button>
-    </div>
-    <div class="muscle-grid">
-      <label v-for="m in activeMuscles" :key="m"
-        >{{ muscleGroups[m] }}
-        <select :value="ownTargets?.[m] ?? ''" @change="change(m, $event)">
-          <option value="">
-            {{ inherited ? 'Eredita: ' + (inheritedTargets?.[m] ?? 0).toLocaleString('it-IT') : '0' }}
-          </option>
-          <option v-for="n in 11" :key="n" :value="(n - 1) / 10">
-            {{ ((n - 1) / 10).toLocaleString('it-IT') }}
-          </option>
-        </select>
-      </label>
-    </div>
+    <ul v-if="activeMuscles.length" class="assigned-list">
+      <li v-for="m in activeMuscles" :key="m" class="target-row">
+        <span class="assigned-name">{{ muscleGroups[m] }}</span>
+        <strong class="target-value">{{ effective(m).toLocaleString('it-IT') }}</strong>
+        <button
+          type="button"
+          class="icon-btn"
+          :aria-label="'Modifica target ' + muscleGroups[m]"
+          @click="openTarget(m)"
+        >
+          <GIcon name="edit" :size="16" />
+        </button>
+        <button
+          type="button"
+          class="icon-btn danger"
+          :aria-label="'Rimuovi target ' + muscleGroups[m]"
+          @click="removeTarget(m)"
+        >
+          <GIcon name="trash" :size="16" />
+        </button>
+      </li>
+    </ul>
+    <button
+      type="button"
+      class="secondary compact-add"
+      aria-label="Aggiungi target muscolare"
+      :disabled="activeMuscles.length === muscles.length"
+      @click="openTarget()"
+    >
+      Aggiungi
+    </button>
   </component>
+  <Teleport to="body">
+    <AppModal :open="menuOpen" title="TARGET MUSCOLARE" @close="menuOpen = false">
+      <form @submit.stop.prevent="confirmTarget">
+        <label
+          >Muscolo<select v-model="selectedMuscle" :disabled="editing" required autofocus>
+            <option value="">Seleziona muscolo</option>
+            <option v-for="m in muscles" :key="m" :value="m" :disabled="!editing && effective(m) > 0">
+              {{ muscleGroups[m] }}{{ !editing && effective(m) > 0 ? ' (aggiunto)' : '' }}
+            </option>
+          </select></label
+        >
+        <label
+          >Valore<select v-model="coefficient">
+            <option v-if="inherited && selectedMuscle" value="">
+              Eredita: {{ (inheritedTargets?.[selectedMuscle] ?? 0).toLocaleString('it-IT') }}
+            </option>
+            <option v-for="n in 11" :key="n" :value="(n - 1) / 10">
+              {{ ((n - 1) / 10).toLocaleString('it-IT') }}
+            </option>
+          </select></label
+        >
+        <div class="button-group">
+          <button type="button" class="secondary" @click="menuOpen = false">Annulla</button>
+          <button type="submit" class="primary" :disabled="!selectedMuscle">
+            {{ editing ? 'Conferma' : 'Aggiungi' }}
+          </button>
+        </div>
+      </form>
+    </AppModal>
+  </Teleport>
 </template>

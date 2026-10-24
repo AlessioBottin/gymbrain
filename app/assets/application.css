@@ -823,3 +823,40 @@ dialog:has(.program-builder) .modal-top {
 .selector-add-row .icon-btn {
   flex-shrink: 0;
 }
+
+.assigned-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+}
+.assigned-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+.assigned-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.assigned-list .target-value {
+  min-width: 32px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.assigned-list .icon-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+}
+.compact-add {
+  padding: 8px 10px;
+  min-height: 36px;
+  font-size: 12px;
+}
+
+.actual-grid > .set-assistance,
+.target-editor > .set-assistance {
+  grid-column: 1 / -1;
+}

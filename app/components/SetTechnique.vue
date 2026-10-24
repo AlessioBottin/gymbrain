@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { Target } from '../../shared/domain';
 const props = defineProps<{ set: Target; measurement?: string }>();
-function technique(event: Event) {
-  const type = (event.target as HTMLSelectElement).value as NonNullable<Target['technique']>;
+const groupName = useId();
+function technique(type: NonNullable<Target['technique']>) {
   props.set.technique = type;
   if (type === 'standard') delete props.set.segments;
   else if (!props.set.segments)
@@ -16,21 +16,25 @@ function technique(event: Event) {
 </script>
 <template>
   <div class="set-technique">
-    <label
-      >Tecnica serie<select :value="set.technique || 'standard'" @change="technique">
-        <option value="standard">Standard</option>
-        <option value="cluster">Cluster set</option>
-        <option value="drop">Drop set</option>
-      </select></label
-    >
-    <label
-      >Recupero dopo la serie (secondi)<input
-        v-model.number="set.restSeconds"
-        type="number"
-        min="0"
-        max="3600"
-        placeholder="90"
-    /></label>
+    <fieldset class="exercise-choices">
+      <legend>Tipo di set</legend>
+      <div class="exercise-choice-options">
+        <label
+          v-for="option in [
+            ['standard', 'Standard'],
+            ['cluster', 'Cluster set'],
+            ['drop', 'Drop set'],
+          ] as const"
+          :key="option[0]"
+          ><input
+            type="radio"
+            :name="groupName"
+            :checked="(set.technique || 'standard') === option[0]"
+            @change="technique(option[0])"
+          /><span>{{ option[1] }}</span></label
+        >
+      </div>
+    </fieldset>
     <template v-if="set.technique === 'cluster' || set.technique === 'drop'">
       <p class="notice">
         {{

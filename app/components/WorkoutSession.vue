@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { setLoad } from '../../shared/setDefaults';
 import {
   sessionSchema,
   validRecordedSet,
@@ -150,11 +151,6 @@ function changeVariant(id: string) {
   current.value.variant = v ? { ...v, muscleTargets: {} } : null;
   void persist();
 }
-function changeAssistance(bands: TrainingSession['exercises'][number]['assistance']) {
-  if (!current.value) return;
-  current.value.assistance = bands;
-  void persist();
-}
 function swap() {
   const row = props.catalog.find((r) => r.id === replacement.value),
     e = current.value;
@@ -303,11 +299,6 @@ const modes: Record<string, string> = {
             </select></label
           >
           <p v-if="current.variant?.notes" class="notice">{{ current.variant.notes }}</p>
-          <AssistancePicker
-            v-if="current.exerciseType === 'bodyweight'"
-            :model-value="current.assistance"
-            @update:model-value="changeAssistance"
-          />
           <label v-if="current.exerciseType === 'bodyweight'"
             >Banda e configurazione<input
               v-model="current.band"
@@ -421,7 +412,7 @@ const modes: Record<string, string> = {
                 :step="['rpe', 'load'].includes(k) ? '.5' : 1"
                 placeholder="—"
                 @commit="
-                  (s as any)[k] = $event;
+                  k === 'load' ? setLoad(current.actual, i, $event) : ((s as any)[k] = $event);
                   persist();
                 " /></label
             ><button
@@ -433,6 +424,14 @@ const modes: Record<string, string> = {
             >
               {{ s.done ? '✓' : '○' }}
             </button>
+            <SetAssistance
+              v-if="current.exerciseType === 'bodyweight'"
+              :sets="current.actual"
+              :index="i"
+              :fallback="current.assistance"
+              :disabled="s.done"
+              @change="persist"
+            />
           </div>
           <button
             class="text-btn"
@@ -454,15 +453,12 @@ const modes: Record<string, string> = {
           <p class="notice">
             ¹ Solo carico esterno o zavorra. L’assistenza elastica non viene sottratta dal peso corporeo.
           </p>
-          <label
-            >Note di esecuzione<textarea
-              v-model="current.sessionNotes"
-              rows="2"
-              maxlength="4000"
-              placeholder="Come ti sei sentito?"
-              @change="persist"
-            />
-          </label></section
+          <OptionalNotes
+            :key="current.id"
+            v-model="current.sessionNotes"
+            label="Note di esecuzione"
+            @change="persist"
+          /></section
       ></Transition>
       <div class="session-actions">
         <button

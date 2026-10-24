@@ -21,7 +21,7 @@ export function trainingSequence(exercises: Prescription[]): TrainingStep[] {
             ? exercise.group.type === 'superset' && index < active.length - 1
               ? 0
               : exercise.group.restSeconds
-            : (x.e.sets[round]?.restSeconds ?? 90),
+            : (x.e.restSeconds ?? x.e.sets[round]?.restSeconds ?? 90),
         }),
       );
     }

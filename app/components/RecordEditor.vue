@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { setLoad as updateSetLoad } from '../../shared/setDefaults';
 import {
   newTarget,
   exerciseSchema,
@@ -324,48 +325,39 @@ function clean(set: any, key: string, event: Event) {
           </section>
           <fieldset class="assistance-picker">
             <legend>Varianti</legend>
-            <div class="selector-add-row variant-selection">
-              <select
-                aria-label="Variante da modificare"
-                :value="selectedVariant?.id || ''"
-                :disabled="!draft.variants.length"
-                @change="selectedVariantId = ($event.target as HTMLSelectElement).value"
-              >
-                <option v-if="!draft.variants.length" value="">Nessuna variante</option>
-                <option v-for="variant in draft.variants" :key="variant.id" :value="variant.id">
-                  {{ variant.name }}
-                </option>
-              </select>
-              <button
-                type="button"
-                class="secondary compact-add"
-                aria-label="Aggiungi variante"
-                :disabled="draft.variants.length >= 30"
-                @click="addVariant"
-              >
-                Aggiungi
-              </button>
-              <button
-                v-if="selectedVariant"
-                type="button"
-                class="icon-btn"
-                aria-label="Modifica variante"
-                title="Modifica variante"
-                @click="editVariant"
-              >
-                <GIcon name="edit" :size="18" />
-              </button>
-              <button
-                v-if="selectedVariant"
-                type="button"
-                class="icon-btn danger"
-                aria-label="Rimuovi variante"
-                title="Rimuovi variante"
-                @click="draft.variants = draft.variants.filter((v: any) => v.id !== selectedVariant?.id)"
-              >
-                <GIcon name="trash" :size="18" />
-              </button>
-            </div>
+            <ul v-if="draft.variants.length" class="assigned-list variant-list">
+              <li v-for="variant in draft.variants" :key="variant.id">
+                <span class="assigned-name">{{ variant.name }}</span>
+                <button
+                  type="button"
+                  class="icon-btn"
+                  :aria-label="'Modifica variante ' + variant.name"
+                  @click="
+                    selectedVariantId = variant.id;
+                    editVariant();
+                  "
+                >
+                  <GIcon name="edit" :size="16" />
+                </button>
+                <button
+                  type="button"
+                  class="icon-btn danger"
+                  :aria-label="'Rimuovi variante ' + variant.name"
+                  @click="draft.variants = draft.variants.filter((v: any) => v.id !== variant.id)"
+                >
+                  <GIcon name="trash" :size="16" />
+                </button>
+              </li>
+            </ul>
+            <button
+              type="button"
+              class="secondary compact-add"
+              aria-label="Aggiungi variante"
+              :disabled="draft.variants.length >= 30"
+              @click="addVariant"
+            >
+              Aggiungi
+            </button>
           </fieldset>
           <button
             v-if="!videoLinkOpen && !draft.videoUrl"
@@ -462,13 +454,7 @@ function clean(set: any, key: string, event: Event) {
                 <option value="duration">Isometria - secondi</option>
               </select></label
             >
-            <label
-              >Note specifiche per questa scheda<textarea
-                v-model="e.notes"
-                rows="2"
-                placeholder="Es. salita esplosiva nella fase di forza"
-              />
-            </label>
+            <OptionalNotes v-model="e.notes" label="Note specifiche per questa scheda" />
             <label
               >Variante del movimento<select
                 :value="e.variant?.id || ''"
@@ -487,6 +473,7 @@ function clean(set: any, key: string, event: Event) {
               </select></label
             >
             <ExerciseGroup :exercise="e" :exercises="prescriptions" />
+            <ExerciseRest :exercise="e" />
             <p v-if="e.variant?.notes" class="notice">{{ e.variant.notes }}</p>
             <p class="subtle">
               {{
@@ -509,7 +496,6 @@ function clean(set: any, key: string, event: Event) {
             <p class="notice">
               Imposta tutte le serie; puoi poi modificare i kg di ciascuna serie qui sotto.
             </p>
-            <AssistancePicker v-if="e.exerciseType === 'bodyweight'" v-model="e.assistance" />
             <label v-if="e.exerciseType === 'bodyweight'"
               >Banda / configurazione<input
                 v-model="e.band"
@@ -551,7 +537,7 @@ function clean(set: any, key: string, event: Event) {
                 :min="k === 'rpe' ? 1 : 0"
                 :max="['rpe', 'rir'].includes(k) ? 10 : 2000"
                 :step="['rpe', 'load'].includes(k) ? '.5' : 1"
-                @commit="s[k] = $event"
+                @commit="k === 'load' ? updateSetLoad(e.sets, j, $event) : (s[k] = $event)"
               /><button
                 type="button"
                 class="icon-btn danger"
@@ -562,9 +548,15 @@ function clean(set: any, key: string, event: Event) {
               >
                 <GIcon name="trash" :size="18" />
               </button>
+              <SetAssistance
+                v-if="e.exerciseType === 'bodyweight'"
+                :sets="e.sets"
+                :index="j"
+                :fallback="e.assistance"
+              />
             </div>
             <details>
-              <summary>Tecniche e recuperi per serie</summary>
+              <summary>Tecniche per serie</summary>
               <div v-for="(set, index) in e.sets" :key="index">
                 <h4>Serie {{ index + 1 }}</h4>
                 <SetTechnique :set="set" :measurement="e.measurement" />
@@ -574,7 +566,12 @@ function clean(set: any, key: string, event: Event) {
               type="button"
               class="text-btn"
               :disabled="e.sets.length >= 30"
-              @click="e.sets.push(newTarget(e.measurement))"
+              @click="
+                e.sets.push({
+                  ...JSON.parse(JSON.stringify(e.sets[0] || newTarget(e.measurement))),
+                  assistance: undefined,
+                })
+              "
             >
               + Aggiungi serie
             </button>
